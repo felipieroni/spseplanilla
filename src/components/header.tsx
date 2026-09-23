@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { CircleUser, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -13,62 +13,39 @@ import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { useOperador } from '@/context/operador-context';
 
 const navItems = [
   { href: '/', label: 'Cargar Datos' },
-  { href: '/historial', label: 'Historial de Planillas' },
-  { href: '/guia-dosificacion', label: 'Guía de Dosificación' },
+  { href: '/historial', label: 'Historial' },
+  { href: '/guia-dosificacion', label: 'Guía Dosificación' },
   { href: '/guia-parshall', label: 'Guía Parshall' },
 ];
 
-interface HeaderProps {
-  operadorNombre?: string;
-  turnoSeleccionado?: string;
-  onEditarOperador?: () => void;
-}
-
-export function Header({
-  operadorNombre = 'BENICIO FILOSA',
-  turnoSeleccionado = '06:00 a 12:00',
-  onEditarOperador,
-}: HeaderProps) {
+export function Header() {
   const pathname = usePathname();
-
-  // Aseguramos que el texto del turno siempre tenga el formato consistente
-  const turnoTexto = turnoSeleccionado.startsWith('Turno')
-    ? turnoSeleccionado
-    : `Turno ${turnoSeleccionado}`;
+  const { operadorActual, turnoActivo, horaActualSistema, abrirModalOperador } = useOperador();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
-      <div className="flex h-20 items-center px-4 md:px-6">
-        
-        {/* LOGO E IDENTIFICACIÓN */}
-        <div className="flex items-center">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/logo.jpg"
-              alt="SPSE Laboratorio Logo"
-              width={70}
-              height={70}
-              priority
-            />
-            <span className="text-xl font-bold font-headline text-primary">
-              SPSE Laboratorio
-            </span>
-          </Link>
-        </div>
+      <div className="flex h-12 items-center px-3 gap-3">
 
-        {/* NAVEGACIÓN PRINCIPAL (ESCRITORIO) */}
-        <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
+        {/* LOGO */}
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Image src="/logo.jpg" alt="SPSE Logo" width={36} height={36} priority />
+          <span className="text-sm font-bold text-primary hidden md:block">Planta Potabilizadora CALAFATE</span>
+        </Link>
+
+        {/* NAVEGACIÓN ESCRITORIO */}
+        <nav className="hidden md:flex items-center gap-1 flex-1">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'text-base font-medium transition-colors hover:text-primary',
+                'text-xs font-medium px-3 py-1.5 rounded-md transition-colors hover:bg-accent hover:text-accent-foreground',
                 pathname === item.href
-                  ? 'text-primary font-bold border-b-2 border-primary pb-1'
+                  ? 'bg-primary text-primary-foreground font-bold'
                   : 'text-foreground/60'
               )}
             >
@@ -77,41 +54,48 @@ export function Header({
           ))}
         </nav>
 
-        
+        {/* FICHA OPERADOR + RELOJ */}
+        <div
+          onClick={() => abrirModalOperador()}
+          className="flex items-center gap-2 border border-sky-300 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-lg cursor-pointer transition-all shrink-0 ml-auto"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <div className="flex flex-col leading-tight">
+            <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide">
+              {operadorActual}
+              <span className="text-sky-500 font-normal ml-1 text-[10px]">(Editar)</span>
+            </span>
+            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+              <span>Turno: <strong className="text-slate-700">{turnoActivo}</strong></span>
+              <span className="font-mono text-emerald-600 font-extrabold text-xs">{horaActualSistema}</span>
+            </div>
+          </div>
+        </div>
 
         {/* MENÚ MÓVIL */}
-        <div className="md:hidden ml-auto">
+        <div className="md:hidden">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle navigation menu</span>
+              <Button variant="outline" size="icon" className="h-8 w-8">
+                <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left">
-              <div className="flex flex-col gap-6 p-4 h-full">
+              <div className="flex flex-col gap-6 p-4">
                 <Link href="/" className="flex items-center gap-2">
-                  <Image
-                    src="/logo.jpg"
-                    alt="SPSE Laboratorio Logo"
-                    width={60}
-                    height={60}
-                  />
-                  <span className="text-lg font-bold font-headline text-primary">
-                    SPSE Laboratorio
-                  </span>
+                  <Image src="/logo.jpg" alt="SPSE Logo" width={48} height={48} />
+                  <span className="text-base font-bold text-primary">Planta Potabilizadora CALAFATE</span>
                 </Link>
-
-                <nav className="grid gap-4 mt-4">
+                <nav className="grid gap-3 mt-2">
                   {navItems.map((item) => (
                     <SheetClose asChild key={item.href}>
                       <Link
                         href={item.href}
                         className={cn(
-                          'text-lg font-medium transition-colors hover:text-primary',
-                          pathname === item.href
-                            ? 'text-primary font-bold'
-                            : 'text-muted-foreground'
+                          'text-sm font-medium transition-colors hover:text-primary',
+                          pathname === item.href ? 'text-primary font-bold' : 'text-muted-foreground'
                         )}
                       >
                         {item.label}
@@ -119,25 +103,6 @@ export function Header({
                     </SheetClose>
                   ))}
                 </nav>
-
-                {/* VISUALIZADOR DE OPERADOR EN MÓVIL */}
-                <div className="mt-auto border-t pt-4">
-                  <div 
-                    onClick={onEditarOperador}
-                    className="flex items-center gap-3 p-2 rounded-lg border border-sky-100 bg-sky-50/50 cursor-pointer"
-                  >
-                    <CircleUser className="h-8 w-8 text-primary" />
-                    <div className="flex flex-col">
-                      <span className="font-extrabold text-xs uppercase text-slate-800">
-                        {operadorNombre}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {turnoTexto}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </SheetContent>
           </Sheet>
