@@ -185,12 +185,11 @@ export default function PlanillaUnificada24H() {
   const obtenerFiltrosRecomendadosPorModulo = (listaFiltros: typeof FILTROS_MODULO_A) => {
     const ultimoPasoLavado: Record<string, number> = {};
 
-    // Inicializamos con -Infinity (significa que jamás ha sido lavado)
     listaFiltros.forEach((f) => {
       ultimoPasoLavado[f.key] = -Infinity;
     });
 
-    // 1. Revisar la planilla activa en tiempo real (cada hora de HORARIOS equivale a un paso 0..11)
+    // 1. Revisar la planilla activa en tiempo real
     Object.entries(filtrosEstado || {}).forEach(([hs, hsData]) => {
       if (!hsData) return;
       const hIndex = HORARIOS.indexOf(hs);
@@ -205,11 +204,10 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 2. Revisar el historial guardado (orden cronológico inverso)
+    // 2. Revisar el historial guardado
     historial.forEach((registro, idx) => {
       if (!registro.filtrosEstado) return;
       
-      // idx = 0 es la planilla guardada más reciente. Retrocedemos de a 12 horas por planilla.
       const offsetRegistro = -(idx + 1) * HORARIOS.length;
 
       Object.entries(registro.filtrosEstado).forEach(([hs, hsData]) => {
@@ -229,7 +227,7 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 3. Buscar el valor MÍNIMO de paso de lavado (el filtro lavado más atrás en el tiempo)
+    // 3. Buscar el valor MÍNIMO de paso de lavado
     let minPaso = Infinity;
     listaFiltros.forEach((f) => {
       if (ultimoPasoLavado[f.key] < minPaso) {
@@ -239,7 +237,6 @@ export default function PlanillaUnificada24H() {
 
     const recomendados = listaFiltros.filter((f) => ultimoPasoLavado[f.key] === minPaso);
 
-    // Si todos tienen exactamente la misma antigüedad o ninguno se lavó nunca, sugerir el primero
     if (recomendados.length === listaFiltros.length) {
       return listaFiltros.slice(0, 1);
     }
@@ -867,7 +864,7 @@ export default function PlanillaUnificada24H() {
             
             {/* TABLA LAVADO DE FILTROS (MÓDULO A Y MÓDULO B) */}
             <div className="lg:col-span-5 overflow-x-auto w-full flex flex-col">
-              <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full">
+              <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full table-fixed">
                 <thead>
                   <tr className="bg-cyan-950 text-white font-black tracking-wider border-b border-slate-400">
                     <th className="border border-slate-400 p-1 text-xs uppercase" colSpan={9}>
@@ -875,7 +872,7 @@ export default function PlanillaUnificada24H() {
                     </th>
                   </tr>
                   <tr className="bg-cyan-900 text-white font-bold border-b border-slate-400 text-xs">
-                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5" rowSpan={2}>HS</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
                     <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO A</th>
                     <th className="border border-slate-400 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO B</th>
                   </tr>
@@ -887,7 +884,7 @@ export default function PlanillaUnificada24H() {
                           key={f.key} 
                           className={`border border-slate-400 p-0.5 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
                         >
-                          <span className={esRecomendado ? 'text-red-500 font-black text-sm bg-white/20 px-1 rounded' : ''}>
+                          <span className={esRecomendado ? 'text-red-500 font-black block' : ''}>
                             {f.label}
                           </span>
                         </th>
