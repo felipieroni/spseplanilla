@@ -24,7 +24,7 @@ const navItems = [
 
 export function Header() {
   const pathname = usePathname();
-  const { operadorActual, turnoActivo, horaActualSistema, abrirModalOperador } = useOperador();
+  const { operadorActual, horaActualSistema, abrirModalOperador } = useOperador();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
@@ -67,8 +67,7 @@ export function Header() {
               {operadorActual}
               <span className="text-sky-500 font-normal ml-1 text-[10px]">(Editar)</span>
             </span>
-            <div className="flex items-center gap-2 text-[10px] text-slate-500">
-              <span>Turno: <strong className="text-slate-700">{turnoActivo}</strong></span>
+            <div className="flex items-center text-[10px]">
               <span className="font-mono text-emerald-600 font-extrabold text-xs">{horaActualSistema}</span>
             </div>
           </div>
