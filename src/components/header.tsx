@@ -30,14 +30,14 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
       <div className="flex h-12 items-center px-3 gap-3">
 
-        {/* LOGO */}
+        {/* LOGO Y TÍTULO (IZQUIERDA) */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Image src="/logo.jpg" alt="SPSE Logo" width={36} height={36} priority />
           <span className="text-sm font-bold text-primary hidden md:block">Planta Potabilizadora CALAFATE</span>
         </Link>
 
-        {/* NAVEGACIÓN ESCRITORIO */}
-        <nav className="hidden md:flex items-center gap-1 flex-1">
+        {/* NAVEGACIÓN ESCRITORIO (CENTRADA) */}
+        <nav className="hidden md:flex items-center justify-center gap-1 flex-1">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -54,7 +54,7 @@ export function Header() {
           ))}
         </nav>
 
-        {/* FICHA OPERADOR + RELOJ */}
+        {/* FICHA OPERADOR + RELOJ (DERECHA) */}
         <div
           onClick={() => abrirModalOperador()}
           className="flex items-center gap-2 border border-sky-300 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-lg cursor-pointer transition-all shrink-0 ml-auto"
