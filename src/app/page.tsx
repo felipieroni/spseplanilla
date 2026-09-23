@@ -181,6 +181,76 @@ export default function PlanillaUnificada24H() {
     return () => clearInterval(interval);
   }, [fecha]);
 
+  // ALGORITMO PRECISO: OBTENER FILTRO(S) CON MÁS TIEMPO SIN LAVAR POR HORAS Y MÓDULO INDEPENDIENTE
+  const obtenerFiltrosRecomendadosPorModulo = (listaFiltros: typeof FILTROS_MODULO_A) => {
+    const ultimoPasoLavado: Record<string, number> = {};
+
+    // Inicializamos con -Infinity (significa que jamás ha sido lavado)
+    listaFiltros.forEach((f) => {
+      ultimoPasoLavado[f.key] = -Infinity;
+    });
+
+    // 1. Revisar la planilla activa en tiempo real (cada hora de HORARIOS equivale a un paso 0..11)
+    Object.entries(filtrosEstado || {}).forEach(([hs, hsData]) => {
+      if (!hsData) return;
+      const hIndex = HORARIOS.indexOf(hs);
+      if (hIndex === -1) return;
+
+      listaFiltros.forEach((f) => {
+        if (hsData[f.key] === 'L') {
+          if (hIndex > ultimoPasoLavado[f.key]) {
+            ultimoPasoLavado[f.key] = hIndex;
+          }
+        }
+      });
+    });
+
+    // 2. Revisar el historial guardado (orden cronológico inverso)
+    historial.forEach((registro, idx) => {
+      if (!registro.filtrosEstado) return;
+      
+      // idx = 0 es la planilla guardada más reciente. Retrocedemos de a 12 horas por planilla.
+      const offsetRegistro = -(idx + 1) * HORARIOS.length;
+
+      Object.entries(registro.filtrosEstado).forEach(([hs, hsData]) => {
+        if (!hsData) return;
+        const hIndex = HORARIOS.indexOf(hs);
+        if (hIndex === -1) return;
+
+        const pasoGlobal = offsetRegistro + hIndex;
+
+        listaFiltros.forEach((f) => {
+          if (hsData[f.key] === 'L') {
+            if (pasoGlobal > ultimoPasoLavado[f.key]) {
+              ultimoPasoLavado[f.key] = pasoGlobal;
+            }
+          }
+        });
+      });
+    });
+
+    // 3. Buscar el valor MÍNIMO de paso de lavado (el filtro lavado más atrás en el tiempo)
+    let minPaso = Infinity;
+    listaFiltros.forEach((f) => {
+      if (ultimoPasoLavado[f.key] < minPaso) {
+        minPaso = ultimoPasoLavado[f.key];
+      }
+    });
+
+    const recomendados = listaFiltros.filter((f) => ultimoPasoLavado[f.key] === minPaso);
+
+    // Si todos tienen exactamente la misma antigüedad o ninguno se lavó nunca, sugerir el primero
+    if (recomendados.length === listaFiltros.length) {
+      return listaFiltros.slice(0, 1);
+    }
+
+    return recomendados;
+  };
+
+  const recomendadosModuloA = obtenerFiltrosRecomendadosPorModulo(FILTROS_MODULO_A);
+  const recomendadosModuloB = obtenerFiltrosRecomendadosPorModulo(FILTROS_MODULO_B);
+  const filtrosRecomendados = [...recomendadosModuloA, ...recomendadosModuloB];
+
   // NAVEGACIÓN CON ENTER HACIA LA DERECHA
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -279,7 +349,6 @@ export default function PlanillaUnificada24H() {
 
       const Qp = parseNumber(horaActual.caudal);
 
-      // Si cambia el CAUDAL, mantenemos fijas las p.p.m. y recalculamos automáticamente las dosificaciones en ml/min
       if (campo === 'caudal') {
         if (Qp > 0) {
           const pacPpmVal = parseNumber(horaActual.pacPpm);
@@ -486,12 +555,13 @@ export default function PlanillaUnificada24H() {
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="p-2 flex flex-col gap-2">
+        {/* SUB-HEADER CON OPCIONES DE TURNO CENTRADAS */}
         <div className="flex flex-wrap justify-between items-center bg-white p-2 rounded shadow-sm border gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="font-bold text-sm text-slate-800">
-              Planilla Control Planta Potabilizadora SPSE
-            </h1>
-            
+          <h1 className="font-bold text-sm text-slate-800 shrink-0">
+            Planilla Control Planta Potabilizadora SPSE
+          </h1>
+          
+          <div className="flex-1 flex justify-center">
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border">
               <span className="text-xs font-semibold text-slate-500 px-1">Turno:</span>
               {Object.keys(MAPA_TURNOS).map((t) => (
@@ -508,7 +578,7 @@ export default function PlanillaUnificada24H() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <label className="font-semibold text-slate-600 text-xs">Fecha:</label>
             <input 
               type="date" 
@@ -586,7 +656,7 @@ export default function PlanillaUnificada24H() {
                           <td 
                             key={bKey} 
                             className={`border border-slate-400 p-0 transition-colors ${
-                              val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === 'P' ? 'bg-rose-200 font-bold text-rose-950' : ''
+                              val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === 'P' ? 'bg-rose-200 font-bold text-rose-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                             }`}
                           >
                             <DropdownMenu>
@@ -601,6 +671,9 @@ export default function PlanillaUnificada24H() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, 'P')} className="text-xs font-bold bg-rose-100 py-1.5 cursor-pointer">
                                   P (Parada)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, '/')} className="text-xs font-bold bg-slate-200 py-1.5 cursor-pointer">
+                                  / (Fuera de Servicio)
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                   Limpiar
@@ -755,7 +828,7 @@ export default function PlanillaUnificada24H() {
                           <td 
                             key={bKey} 
                             className={`border border-slate-400 p-0 transition-colors ${
-                              val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === 'P' ? 'bg-rose-200 font-bold text-rose-950' : ''
+                              val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === 'P' ? 'bg-rose-200 font-bold text-rose-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                             }`}
                           >
                             <DropdownMenu>
@@ -770,6 +843,9 @@ export default function PlanillaUnificada24H() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, 'P')} className="text-xs font-bold bg-rose-100 py-1.5 cursor-pointer">
                                   P (Parada)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, '/')} className="text-xs font-bold bg-slate-200 py-1.5 cursor-pointer">
+                                  / (Fuera de Servicio)
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setEstadoBomba(hs, bKey, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                   Limpiar
@@ -804,14 +880,19 @@ export default function PlanillaUnificada24H() {
                     <th className="border border-slate-400 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO B</th>
                   </tr>
                   <tr className="bg-cyan-800 text-white font-bold border-b border-slate-400 text-xs">
-                    {ALL_FILTROS.map((f) => (
-                      <th 
-                        key={f.key} 
-                        className={`border border-slate-400 p-0.5 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
-                      >
-                        {f.label}
-                      </th>
-                    ))}
+                    {ALL_FILTROS.map((f) => {
+                      const esRecomendado = filtrosRecomendados.some((rec) => rec.key === f.key);
+                      return (
+                        <th 
+                          key={f.key} 
+                          className={`border border-slate-400 p-0.5 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
+                        >
+                          <span className={esRecomendado ? 'text-red-500 font-black text-sm bg-white/20 px-1 rounded' : ''}>
+                            {f.label}
+                          </span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -833,7 +914,7 @@ export default function PlanillaUnificada24H() {
                             <td 
                               key={f.key} 
                               className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
-                                val === 'L' ? 'bg-red-400 text-black font-black' : val === 'M' ? 'bg-emerald-100 font-bold text-emerald-950' : ''
+                                val === 'L' ? 'bg-red-400 text-black font-black' : val === 'M' ? 'bg-emerald-100 font-bold text-emerald-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                               }`}
                             >
                               <DropdownMenu>
@@ -848,6 +929,9 @@ export default function PlanillaUnificada24H() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'M')} className="text-xs font-bold py-1.5 cursor-pointer">
                                     M (Marcha)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, '/')} className="text-xs font-bold bg-slate-200 py-1.5 cursor-pointer">
+                                    / (Fuera de Servicio)
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                     Limpiar
@@ -908,7 +992,7 @@ export default function PlanillaUnificada24H() {
                             <td 
                               key={s.key} 
                               className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
-                                val === 'P' ? 'bg-amber-300 font-extrabold text-amber-950' : ''
+                                val === 'P' ? 'bg-amber-300 font-extrabold text-amber-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                               }`}
                             >
                               <DropdownMenu>
@@ -920,6 +1004,9 @@ export default function PlanillaUnificada24H() {
                                 <DropdownMenuContent align="center" className="min-w-[5rem] p-1">
                                   <DropdownMenuItem onClick={() => setEstadoPurga(hs, s.key, 'P')} className="text-xs font-black bg-amber-100 py-1.5 cursor-pointer">
                                     P (Purga)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEstadoPurga(hs, s.key, '/')} className="text-xs font-bold bg-slate-200 py-1.5 cursor-pointer">
+                                    / (Fuera de Servicio)
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setEstadoPurga(hs, s.key, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                     Limpiar
