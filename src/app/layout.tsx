@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { Header } from '@/components/header';
 import { Toaster } from '@/components/ui/toaster';
 import { FormProvider } from '@/context/form-context';
-
+import { OperadorProvider } from '@/context/operador-context';
 
 export const metadata: Metadata = {
   title: 'SPSE control de planta',
@@ -25,15 +25,17 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased')}>
-        <FormProvider>
+        <OperadorProvider>
+          <FormProvider>
             <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow bg-background">
+              <Header />
+              <main className="flex-grow bg-background">
                 {children}
-            </main>
+              </main>
             </div>
             <Toaster />
-        </FormProvider>
+          </FormProvider>
+        </OperadorProvider>
       </body>
     </html>
   );
