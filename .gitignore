@@ -3,3 +3,5 @@ node_modules/
 __MACOSX/
 *.log
 .env*.local
+.vercel
+.env*
