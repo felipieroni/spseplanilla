@@ -18,8 +18,31 @@ export interface RegistroHistorial {
 }
 
 const HORARIOS = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
-const FILTROS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6'];
-const PURGAS = ['S1', 'S2', 'S3', 'S4'];
+
+// ESTRUCTURA EN MÓDULO A Y MÓDULO B SINCRONIZADA CON LA PÁGINA PRINCIPAL
+const FILTROS_MODULO_A = [
+  { key: 'MA_F1', label: 'F1' },
+  { key: 'MA_F2', label: 'F2' },
+  { key: 'MA_F3', label: 'F3' },
+  { key: 'MA_F4', label: 'F4' },
+];
+
+const FILTROS_MODULO_B = [
+  { key: 'MB_F1', label: 'F1' },
+  { key: 'MB_F2', label: 'F2' },
+  { key: 'MB_F3', label: 'F3' },
+  { key: 'MB_F4', label: 'F4' },
+];
+
+const PURGAS_MODULO_A = [
+  { key: 'MA_S1', label: 'S1' },
+  { key: 'MA_S2', label: 'S2' },
+];
+
+const PURGAS_MODULO_B = [
+  { key: 'MB_S1', label: 'S1' },
+  { key: 'MB_S2', label: 'S2' },
+];
 
 interface Props {
   historial?: RegistroHistorial[];
@@ -33,7 +56,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
     ? historial.filter((h) => h.fecha === filtroFecha)
     : historial;
 
-  // FUNCIÓN EXPORTAR A EXCEL PROTEGIDA
+  // FUNCIÓN EXPORTAR A EXCEL CON MÓDULO A Y MÓDULO B
   const exportarPlanillaAExcel = (registro: RegistroHistorial) => {
     const datosFilas = HORARIOS.map((hs) => {
       const p = registro.parametros?.[hs] || {};
@@ -52,24 +75,32 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
         'Turb. CAF': p.turbCaf || '-',
         'pH CAF': p.phCaf || '-',
         'Cloro (ppm)': p.cloro || '-',
-        // Filtros (Lavados)
-        'F1 (Filtro)': f.F1 || '-',
-        'F2 (Filtro)': f.F2 || '-',
-        'F3 (Filtro)': f.F3 || '-',
-        'F4 (Filtro)': f.F4 || '-',
-        'F5 (Filtro)': f.F5 || '-',
-        'F6 (Filtro)': f.F6 || '-',
-        // Purgas (Sedimentadores)
-        'S1 (Purga)': purg.S1 || '-',
-        'S2 (Purga)': purg.S2 || '-',
-        'S3 (Purga)': purg.S3 || '-',
-        'S4 (Purga)': purg.S4 || '-',
+        
+        // MÓDULO A - FILTROS (con fallback a registros viejos M1/F1..F4)
+        'Módulo A - F1 (Filtro)': f.MA_F1 || f.M1_F1 || f.F1 || '-',
+        'Módulo A - F2 (Filtro)': f.MA_F2 || f.M1_F2 || f.F2 || '-',
+        'Módulo A - F3 (Filtro)': f.MA_F3 || f.M1_F3 || f.F3 || '-',
+        'Módulo A - F4 (Filtro)': f.MA_F4 || f.M1_F4 || f.F4 || '-',
+
+        // MÓDULO B - FILTROS (con fallback a registros viejos M2/F5/F6)
+        'Módulo B - F1 (Filtro)': f.MB_F1 || f.M2_F1 || f.F5 || '-',
+        'Módulo B - F2 (Filtro)': f.MB_F2 || f.M2_F2 || f.F6 || '-',
+        'Módulo B - F3 (Filtro)': f.MB_F3 || f.M2_F3 || '-',
+        'Módulo B - F4 (Filtro)': f.MB_F4 || f.M2_F4 || '-',
+
+        // MÓDULO A - PURGAS
+        'Módulo A - S1 (Purga)': purg.MA_S1 || purg.M1_S1 || purg.S1 || '-',
+        'Módulo A - S2 (Purga)': purg.MA_S2 || purg.M1_S2 || purg.S2 || '-',
+
+        // MÓDULO B - PURGAS
+        'Módulo B - S1 (Purga)': purg.MB_S1 || purg.M2_S1 || purg.S3 || '-',
+        'Módulo B - S2 (Purga)': purg.MB_S2 || purg.M2_S2 || purg.S4 || '-',
       };
     });
 
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(datosFilas, { origin: "A5" });
-
+    const worksheet = XLSX.utils.json_to_sheet(datosFilas, { origin: "A5" } as any);
+    
     XLSX.utils.sheet_add_aoa(worksheet, [
       ["PLANILLA DE CONTROL DE PLANTA POTABILIZADORA - HISTORIAL"],
       [`Fecha: ${registro.fecha}`, `Turno: ${registro.turno}`, `Operador: ${registro.operador}`],
@@ -161,7 +192,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
           </table>
         </div>
       ) : (
-        /* VISTA DETALLADA COMPLETA */
+        /* VISTA DETALLADA COMPLETA CON ESTRUCTURA DE MÓDULO A Y MÓDULO B */
         <div className="bg-white border rounded-xl shadow-sm p-4 flex flex-col gap-5">
           <div className="flex justify-between items-center border-b pb-3">
             <div>
@@ -235,22 +266,29 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
             </div>
           </div>
 
-          {/* BLOQUE SECUNDARIO: LAVADO DE FILTROS Y PURGAS */}
+          {/* BLOQUE SECUNDARIO: LAVADO DE FILTROS Y PURGAS EN MÓDULO A Y MÓDULO B */}
           <div className="grid md:grid-cols-2 gap-4">
             
-            {/* SECCIÓN FILTROS (LAVADO) */}
+            {/* SECCIÓN FILTROS (MÓDULO A Y MÓDULO B) */}
             <div className="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-                Estado / Lavado de Filtros (F1 - F6)
+                Estado / Lavado de Filtros (Módulos A y B)
               </h4>
               <div className="overflow-x-auto border bg-white rounded-md">
                 <table className="w-full text-center text-xs border-collapse">
-                  <thead className="bg-slate-200 text-slate-800 font-bold">
-                    <tr>
-                      <th className="p-1.5 border">HS</th>
-                      {FILTROS.map((f) => (
-                        <th key={f} className="p-1.5 border">{f}</th>
+                  <thead>
+                    <tr className="bg-slate-300 text-slate-800 font-bold border-b">
+                      <th className="p-1 border" rowSpan={2}>HS</th>
+                      <th className="p-1 border bg-cyan-100 text-cyan-900" colSpan={4}>MÓDULO A</th>
+                      <th className="p-1 border bg-blue-100 text-blue-900" colSpan={4}>MÓDULO B</th>
+                    </tr>
+                    <tr className="bg-slate-200 text-slate-800 font-bold">
+                      {FILTROS_MODULO_A.map((f) => (
+                        <th key={f.key} className="p-1 border">{f.label}</th>
+                      ))}
+                      {FILTROS_MODULO_B.map((f) => (
+                        <th key={f.key} className="p-1 border">{f.label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -260,12 +298,31 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                       return (
                         <tr key={hs} className="border-b">
                           <td className="p-1 border font-mono font-bold bg-slate-50">{hs}</td>
-                          {FILTROS.map((filtroKey) => {
-                            const val = f[filtroKey] || '-';
+                          
+                          {/* Módulo A */}
+                          {FILTROS_MODULO_A.map((item) => {
+                            const val = f[item.key] || f[`M1_${item.label}`] || f[item.label] || '-';
                             const esLavado = val === 'L' || val === 'Lavado';
                             return (
                               <td
-                                key={filtroKey}
+                                key={item.key}
+                                className={`p-1 border font-bold ${
+                                  esLavado ? 'bg-sky-200 text-sky-900 font-extrabold' : 'text-slate-600'
+                                }`}
+                              >
+                                {val}
+                              </td>
+                            );
+                          })}
+
+                          {/* Módulo B */}
+                          {FILTROS_MODULO_B.map((item, idx) => {
+                            const fallbackOld = idx === 0 ? 'F5' : idx === 1 ? 'F6' : '';
+                            const val = f[item.key] || f[`M2_${item.label}`] || (fallbackOld ? f[fallbackOld] : '') || '-';
+                            const esLavado = val === 'L' || val === 'Lavado';
+                            return (
+                              <td
+                                key={item.key}
                                 className={`p-1 border font-bold ${
                                   esLavado ? 'bg-sky-200 text-sky-900 font-extrabold' : 'text-slate-600'
                                 }`}
@@ -282,19 +339,26 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
               </div>
             </div>
 
-            {/* SECCIÓN PURGAS (SEDIMENTADORES) */}
+            {/* SECCIÓN PURGAS (MÓDULO A Y MÓDULO B) */}
             <div className="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
-                Purgas de Sedimentadores (S1 - S4)
+                Purgas de Sedimentadores (Módulos A y B)
               </h4>
               <div className="overflow-x-auto border bg-white rounded-md">
                 <table className="w-full text-center text-xs border-collapse">
-                  <thead className="bg-slate-200 text-slate-800 font-bold">
-                    <tr>
-                      <th className="p-1.5 border">HS</th>
-                      {PURGAS.map((s) => (
-                        <th key={s} className="p-1.5 border">{s}</th>
+                  <thead>
+                    <tr className="bg-slate-300 text-slate-800 font-bold border-b">
+                      <th className="p-1 border" rowSpan={2}>HS</th>
+                      <th className="p-1 border bg-amber-100 text-amber-900" colSpan={2}>MÓDULO A</th>
+                      <th className="p-1 border bg-orange-100 text-orange-900" colSpan={2}>MÓDULO B</th>
+                    </tr>
+                    <tr className="bg-slate-200 text-slate-800 font-bold">
+                      {PURGAS_MODULO_A.map((s) => (
+                        <th key={s.key} className="p-1 border">{s.label}</th>
+                      ))}
+                      {PURGAS_MODULO_B.map((s) => (
+                        <th key={s.key} className="p-1 border">{s.label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -304,12 +368,31 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                       return (
                         <tr key={hs} className="border-b">
                           <td className="p-1 border font-mono font-bold bg-slate-50">{hs}</td>
-                          {PURGAS.map((purgaKey) => {
-                            const val = purg[purgaKey] || '-';
+                          
+                          {/* Purgas Módulo A */}
+                          {PURGAS_MODULO_A.map((item) => {
+                            const val = purg[item.key] || purg[`M1_${item.label}`] || purg[item.label] || '-';
                             const esPurga = val === 'P' || val === 'Purga';
                             return (
                               <td
-                                key={purgaKey}
+                                key={item.key}
+                                className={`p-1 border font-bold ${
+                                  esPurga ? 'bg-amber-200 text-amber-900 font-extrabold' : 'text-slate-600'
+                                }`}
+                              >
+                                {val}
+                              </td>
+                            );
+                          })}
+
+                          {/* Purgas Módulo B */}
+                          {PURGAS_MODULO_B.map((item, idx) => {
+                            const fallbackOld = idx === 0 ? 'S3' : 'S4';
+                            const val = purg[item.key] || purg[`M2_${item.label}`] || purg[fallbackOld] || '-';
+                            const esPurga = val === 'P' || val === 'Purga';
+                            return (
+                              <td
+                                key={item.key}
                                 className={`p-1 border font-bold ${
                                   esPurga ? 'bg-amber-200 text-amber-900 font-extrabold' : 'text-slate-600'
                                 }`}

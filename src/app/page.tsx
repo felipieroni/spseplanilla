@@ -25,8 +25,34 @@ const MAPA_TURNOS: Record<string, string[]> = {
   '18:00 a 00:00': ['18', '20', '22'],
 };
 
-const FILTROS_KEYS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6'];
-const PURGAS_KEYS = ['S1', 'S2', 'S3', 'S4'];
+// ESTRUCTURA EN MÓDULOS A Y B:
+const FILTROS_MODULO_A = [
+  { key: 'MA_F1', label: 'F1' },
+  { key: 'MA_F2', label: 'F2' },
+  { key: 'MA_F3', label: 'F3' },
+  { key: 'MA_F4', label: 'F4' },
+];
+
+const FILTROS_MODULO_B = [
+  { key: 'MB_F1', label: 'F1' },
+  { key: 'MB_F2', label: 'F2' },
+  { key: 'MB_F3', label: 'F3' },
+  { key: 'MB_F4', label: 'F4' },
+];
+
+const ALL_FILTROS = [...FILTROS_MODULO_A, ...FILTROS_MODULO_B];
+
+const PURGAS_MODULO_A = [
+  { key: 'MA_S1', label: 'S1' },
+  { key: 'MA_S2', label: 'S2' },
+];
+
+const PURGAS_MODULO_B = [
+  { key: 'MB_S1', label: 'S1' },
+  { key: 'MB_S2', label: 'S2' },
+];
+
+const ALL_PURGAS = [...PURGAS_MODULO_A, ...PURGAS_MODULO_B];
 
 const PAC10_PV = 1.26;
 const SODA_PV = 0.05;
@@ -270,6 +296,21 @@ export default function PlanillaUnificada24H() {
 
       const Qp = parseNumber(horaActual.caudal);
 
+      // Si cambia el CAUDAL, mantenemos fijas las p.p.m. y recalculamos automáticamente las dosificaciones en ml/min
+      if (campo === 'caudal') {
+        if (Qp > 0) {
+          const pacPpmVal = parseNumber(horaActual.pacPpm);
+          if (pacPpmVal > 0) {
+            horaActual.pacMlMin = Math.round((pacPpmVal * Qp) / (60 * PAC10_PV)).toString();
+          }
+
+          const sodaPpmVal = parseNumber(horaActual.sodaPpm);
+          if (sodaPpmVal > 0) {
+            horaActual.sodaMlMin = Math.round((sodaPpmVal * Qp) / (60 * SODA_PV)).toString();
+          }
+        }
+      }
+
       if (campo === 'pacPpm') {
         const ppm = parseNumber(valor);
         if (ppm > 0 && Qp > 0) {
@@ -334,7 +375,6 @@ export default function PlanillaUnificada24H() {
   if (!isMounted) return null;
 
   const horasTurnoActual = MAPA_TURNOS[turnoActivo] || [];
-  const operadorActual = operadoresTurnos[turnoActivo] || 'SIN REGISTRAR';
 
   const historialFiltrado = filtroFechaHistorial 
     ? historial.filter(h => h.fecha === filtroFechaHistorial)
@@ -342,44 +382,6 @@ export default function PlanillaUnificada24H() {
 
   return (
     <div className="min-h-screen w-full bg-slate-100 flex flex-col text-xs overflow-y-auto">
-      
-      {/* HEADER */}
-      <header className="w-full bg-white border-b px-4 py-2 flex justify-between items-center shadow-sm">
-        <Button 
-          onClick={() => setModalHistorialAbierto(true)}
-          className="bg-slate-800 hover:bg-slate-900 text-white font-bold flex items-center gap-2 text-xs h-9 px-4 rounded-lg shadow-sm"
-        >
-          Ver Historial
-        </Button>
-
-        <div 
-          onClick={() => abrirModalOperador(turnoActivo)}
-          className="flex items-center gap-4 border-2 border-sky-300 bg-sky-50/80 hover:bg-sky-100 p-2.5 px-4 rounded-xl cursor-pointer transition-all shadow-md group"
-        >
-          <div className="w-11 h-11 rounded-full border-2 border-sky-400 bg-white flex items-center justify-center text-sky-600 group-hover:scale-105 transition-transform shadow-xs">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-
-          <div className="flex flex-col text-left">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-slate-900 text-base leading-tight uppercase tracking-wide">
-                {operadorActual}
-              </span>
-              <span className="text-xs text-sky-600 font-semibold underline opacity-70 group-hover:opacity-100 transition-opacity">
-                (Editar)
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2 text-xs text-slate-600 font-medium mt-0.5">
-              <span>Turno: <strong className="text-slate-800">{turnoActivo}</strong></span>
-              <span>•</span>
-              <span className="font-mono text-emerald-600 font-extrabold text-sm">{horaActualSistema || '00:00:00'}</span>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* MODAL OPERADOR */}
       <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
@@ -824,20 +826,31 @@ export default function PlanillaUnificada24H() {
             </table>
           </div>
 
-          {/* LAVADO DE FILTROS (F1-F6), PURGAS (S1-S4) Y OBSERVACIONES */}
+          {/* LAVADO DE FILTROS, PURGAS Y OBSERVACIONES */}
           <div className="flex flex-col lg:flex-row gap-3 border-t border-slate-300 pt-2 items-stretch">
             
-            {/* TABLA LAVADO DE FILTROS (F1 - F6) */}
+            {/* TABLA LAVADO DE FILTROS (MÓDULO A Y MÓDULO B) */}
             <div className="overflow-x-auto shrink-0">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full">
                 <thead>
                   <tr className="bg-cyan-950 text-white font-black tracking-wider border-b border-slate-400">
-                    <th className="border border-slate-400 p-1 uppercase" colSpan={7}>ESTADO / LAVADO DE FILTROS (F1 - F6)</th>
+                    <th className="border border-slate-400 p-1 uppercase" colSpan={9}>
+                      ESTADO / LAVADO DE FILTROS
+                    </th>
                   </tr>
                   <tr className="bg-cyan-900 text-white font-bold border-b border-slate-400 text-[11px]">
-                    <th className="border border-slate-400 p-0.5 w-8">HS</th>
-                    {FILTROS_KEYS.map((fKey) => (
-                      <th key={fKey} className="border border-slate-400 p-0.5 w-10">{fKey}</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO A</th>
+                    <th className="border border-slate-400 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO B</th>
+                  </tr>
+                  <tr className="bg-cyan-800 text-white font-bold border-b border-slate-400 text-[11px]">
+                    {ALL_FILTROS.map((f) => (
+                      <th 
+                        key={f.key} 
+                        className={`border border-slate-400 p-0.5 w-9 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
+                      >
+                        {f.label}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -848,13 +861,21 @@ export default function PlanillaUnificada24H() {
 
                     return (
                       <tr key={`lavado-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
-                        <td className={`border border-slate-400 p-0 font-bold ${esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'}`}>
+                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
+                          esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
+                        }`}>
                           {hs}
                         </td>
-                        {FILTROS_KEYS.map((fKey) => {
-                          const val = hsFiltros[fKey] || '';
+                        {ALL_FILTROS.map((f) => {
+                          const val = hsFiltros[f.key] || '';
+                          const esUltimoModuloA = f.key === 'MA_F4';
                           return (
-                            <td key={fKey} className={`border border-slate-400 p-0 h-6 ${val === 'L' ? 'bg-cyan-300 font-extrabold text-cyan-950' : val === 'M' ? 'bg-emerald-100 font-bold text-emerald-950' : ''}`}>
+                            <td 
+                              key={f.key} 
+                              className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
+                                val === 'L' ? 'bg-red-400 text-black font-black' : val === 'M' ? 'bg-emerald-100 font-bold text-emerald-950' : ''
+                              }`}
+                            >
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild disabled={!esDelTurnoActual}>
                                   <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed">
@@ -862,13 +883,13 @@ export default function PlanillaUnificada24H() {
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="center" className="min-w-[5rem] p-1">
-                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, fKey, 'L')} className="text-xs font-black bg-cyan-100 py-1.5 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'L')} className="text-xs font-black bg-cyan-100 py-1.5 cursor-pointer">
                                     L (Lavado)
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, fKey, 'M')} className="text-xs font-bold py-1.5 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'M')} className="text-xs font-bold py-1.5 cursor-pointer">
                                     M (Marcha)
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, fKey, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                     Limpiar
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -883,17 +904,28 @@ export default function PlanillaUnificada24H() {
               </table>
             </div>
 
-            {/* TABLA PURGAS DE SEDIMENTADORES (S1 - S4) */}
+            {/* TABLA PURGAS DE SEDIMENTADORES (MÓDULO A Y MÓDULO B) */}
             <div className="overflow-x-auto shrink-0">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full">
                 <thead>
                   <tr className="bg-amber-950 text-white font-black tracking-wider border-b border-slate-400">
-                    <th className="border border-slate-400 p-1 uppercase" colSpan={5}>PURGAS DE SEDIMENTADORES (S1 - S4)</th>
+                    <th className="border border-slate-400 p-1 uppercase" colSpan={5}>
+                      PURGAS DE SEDIMENTADORES
+                    </th>
                   </tr>
                   <tr className="bg-amber-900 text-white font-bold border-b border-slate-400 text-[11px]">
-                    <th className="border border-slate-400 p-0.5 w-8">HS</th>
-                    {PURGAS_KEYS.map((sKey) => (
-                      <th key={sKey} className="border border-slate-400 p-0.5 w-11">{sKey}</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO A</th>
+                    <th className="border border-slate-400 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO B</th>
+                  </tr>
+                  <tr className="bg-amber-800 text-white font-bold border-b border-slate-400 text-[11px]">
+                    {ALL_PURGAS.map((s) => (
+                      <th 
+                        key={s.key} 
+                        className={`border border-slate-400 p-0.5 w-10 ${s.key === 'MA_S2' ? 'border-r-2 border-r-slate-700' : ''}`}
+                      >
+                        {s.label}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -904,13 +936,21 @@ export default function PlanillaUnificada24H() {
 
                     return (
                       <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
-                        <td className={`border border-slate-400 p-0 font-bold ${esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'}`}>
+                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
+                          esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
+                        }`}>
                           {hs}
                         </td>
-                        {PURGAS_KEYS.map((sKey) => {
-                          const val = hsPurgas[sKey] || '';
+                        {ALL_PURGAS.map((s) => {
+                          const val = hsPurgas[s.key] || '';
+                          const esUltimoModuloA = s.key === 'MA_S2';
                           return (
-                            <td key={sKey} className={`border border-slate-400 p-0 h-6 ${val === 'P' ? 'bg-amber-300 font-extrabold text-amber-950' : ''}`}>
+                            <td 
+                              key={s.key} 
+                              className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
+                                val === 'P' ? 'bg-amber-300 font-extrabold text-amber-950' : ''
+                              }`}
+                            >
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild disabled={!esDelTurnoActual}>
                                   <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed">
@@ -918,10 +958,10 @@ export default function PlanillaUnificada24H() {
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="center" className="min-w-[5rem] p-1">
-                                  <DropdownMenuItem onClick={() => setEstadoPurga(hs, sKey, 'P')} className="text-xs font-black bg-amber-100 py-1.5 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoPurga(hs, s.key, 'P')} className="text-xs font-black bg-amber-100 py-1.5 cursor-pointer">
                                     P (Purga)
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setEstadoPurga(hs, sKey, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoPurga(hs, s.key, '')} className="text-xs text-slate-400 py-1 cursor-pointer">
                                     Limpiar
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
