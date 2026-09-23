@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useOperador } from '@/context/operador-context';
 
 const HORARIOS = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
 
@@ -82,16 +83,13 @@ export default function PlanillaUnificada24H() {
   const [fecha, setFecha] = useState('');
   const [horaActualSistema, setHoraActualSistema] = useState('');
 
-  // ESTADO DE TURNO Y OPERADOR
+  // OPERADOR GLOBAL
+  const { operadorActual } = useOperador();
+
+  // ESTADO DE TURNO
   const [turnoActivo, setTurnoActivo] = useState('06:00 a 12:00');
-  const [operadoresTurnos, setOperadoresTurnos] = useState<Record<string, string>>({
-    '06:00 a 12:00': 'BENICIO FILOSA',
-  });
   
-  const [modalAbierto, setModalAbierto] = useState(false);
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
-  const [turnoSeleccionadoTemp, setTurnoSeleccionadoTemp] = useState('');
-  const [nombreOperadorInput, setNombreOperadorInput] = useState('');
 
   // Estados de la planilla
   const [parametros, setParametros] = useState<Record<string, Record<string, string>>>({});
@@ -110,15 +108,6 @@ export default function PlanillaUnificada24H() {
 
     const borradorTurno = localStorage.getItem('borrador_turno_activo');
     if (borradorTurno) setTurnoActivo(borradorTurno);
-
-    const borradorOperadores = localStorage.getItem('borrador_operadores');
-    if (borradorOperadores) {
-      try {
-        setOperadoresTurnos(JSON.parse(borradorOperadores));
-      } catch (e) {
-        console.error("Error al parsear operadores borrador", e);
-      }
-    }
 
     const borradorParametros = localStorage.getItem('borrador_parametros');
     if (borradorParametros) setParametros(JSON.parse(borradorParametros));
@@ -149,10 +138,6 @@ export default function PlanillaUnificada24H() {
   useEffect(() => {
     if (isMounted) localStorage.setItem('borrador_turno_activo', turnoActivo);
   }, [turnoActivo, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_operadores', JSON.stringify(operadoresTurnos));
-  }, [operadoresTurnos, isMounted]);
 
   useEffect(() => {
     if (isMounted) localStorage.setItem('borrador_parametros', JSON.stringify(parametros));
@@ -196,21 +181,19 @@ export default function PlanillaUnificada24H() {
     return () => clearInterval(interval);
   }, [fecha]);
 
-  const abrirModalOperador = (turno: string) => {
-    setTurnoSeleccionadoTemp(turno);
-    setNombreOperadorInput(operadoresTurnos[turno] || '');
-    setModalAbierto(true);
-  };
-
-  const guardarOperador = () => {
-    if (!nombreOperadorInput.trim()) return;
-    
-    setOperadoresTurnos((prev) => ({
-      ...prev,
-      [turnoSeleccionadoTemp]: nombreOperadorInput.trim().toUpperCase(),
-    }));
-    setTurnoActivo(turnoSeleccionadoTemp);
-    setModalAbierto(false);
+  // NAVEGACIÓN CON ENTER HACIA LA DERECHA
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const inputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>('table input:not([disabled])')
+      );
+      const index = inputs.indexOf(e.currentTarget);
+      if (index !== -1 && index + 1 < inputs.length) {
+        inputs[index + 1].focus();
+        inputs[index + 1].select();
+      }
+    }
   };
 
   // GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL
@@ -219,7 +202,7 @@ export default function PlanillaUnificada24H() {
       id: Date.now().toString(),
       fecha: fecha || new Date().toISOString().split('T')[0],
       turno: turnoActivo,
-      operador: operadoresTurnos[turnoActivo] || 'SIN REGISTRAR',
+      operador: operadorActual || 'SIN REGISTRAR',
       observaciones: observacionesGenerales || 'Sin observaciones registradas.',
       descargado: false,
       parametros: JSON.parse(JSON.stringify(parametros)),
@@ -383,40 +366,6 @@ export default function PlanillaUnificada24H() {
   return (
     <div className="min-h-screen w-full bg-slate-100 flex flex-col text-xs overflow-y-auto">
 
-      {/* MODAL OPERADOR */}
-      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-slate-800">
-              Registro de Operador
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            <p className="text-xs text-slate-600">
-              Ingrese el nombre del operador para el turno <span className="font-bold text-blue-900">{turnoSeleccionadoTemp}</span>:
-            </p>
-            <input
-              type="text"
-              placeholder="Nombre y Apellido del Operador"
-              value={nombreOperadorInput}
-              onChange={(e) => setNombreOperadorInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && guardarOperador()}
-              className="text-xs border p-2 rounded outline-none w-full"
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button 
-              onClick={guardarOperador} 
-              disabled={!nombreOperadorInput.trim()}
-              className="bg-blue-700 hover:bg-blue-800 text-xs text-white"
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* MODAL HISTORIAL DE REGISTROS */}
       <Dialog open={modalHistorialAbierto} onOpenChange={setModalHistorialAbierto}>
         <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col w-[95vw]">
@@ -548,7 +497,7 @@ export default function PlanillaUnificada24H() {
               {Object.keys(MAPA_TURNOS).map((t) => (
                 <button
                   key={t}
-                  onClick={() => abrirModalOperador(t)}
+                  onClick={() => setTurnoActivo(t)}
                   className={`px-2 py-0.5 text-xs font-bold rounded transition-all ${
                     turnoActivo === t ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
                   }`}
@@ -669,8 +618,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.nivelPozo ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'nivelPozo', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="3.5" 
+                          placeholder="0" 
                         />
                       </td>
                       
@@ -681,8 +631,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.caudal ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'caudal', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent font-bold disabled:bg-slate-100/50" 
-                          placeholder="1500" 
+                          placeholder="0" 
                         />
                       </td>
                       <td className="border border-slate-400 p-0">
@@ -692,8 +643,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.turbCruda ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'turbCruda', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="10.5" 
+                          placeholder="0" 
                         />
                       </td>
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0">
@@ -703,8 +655,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.phCruda ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'phCruda', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="7.1" 
+                          placeholder="0" 
                         />
                       </td>
                       
@@ -715,8 +668,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.pacMlMin ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'pacMlMin', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="595" 
+                          placeholder="0" 
                         />
                       </td>
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0 bg-blue-50/50">
@@ -726,8 +680,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.pacPpm ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'pacPpm', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs font-bold text-blue-900 p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="30" 
+                          placeholder="0" 
                         />
                       </td>
 
@@ -738,8 +693,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.sodaMlMin ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'sodaMlMin', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="200" 
+                          placeholder="0" 
                         />
                       </td>
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0 bg-emerald-50/50">
@@ -749,8 +705,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.sodaPpm ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'sodaPpm', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs font-bold text-emerald-900 p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="10" 
+                          placeholder="0" 
                         />
                       </td>
                       
@@ -761,8 +718,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.turbCaf ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'turbCaf', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="2.1" 
+                          placeholder="0" 
                         />
                       </td>
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0">
@@ -772,8 +730,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.phCaf ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'phCaf', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="7.0" 
+                          placeholder="0" 
                         />
                       </td>
                       
@@ -784,8 +743,9 @@ export default function PlanillaUnificada24H() {
                           autoComplete="off"
                           value={datosHs.cloro ?? ''} 
                           onChange={(e) => handleInputChange(hs, 'cloro', e.target.value)} 
+                          onKeyDown={handleKeyDown}
                           className="h-7 w-full text-center text-xs p-0 border-none outline-none bg-transparent disabled:bg-slate-100/50" 
-                          placeholder="0.7" 
+                          placeholder="0" 
                         />
                       </td>
 
@@ -826,28 +786,28 @@ export default function PlanillaUnificada24H() {
             </table>
           </div>
 
-          {/* LAVADO DE FILTROS, PURGAS Y OBSERVACIONES */}
-          <div className="flex flex-col lg:flex-row gap-3 border-t border-slate-300 pt-2 items-stretch">
+          {/* LAVADO DE FILTROS, PURGAS Y OBSERVACIONES (DISTRIBUCIÓN GRID 100% ANCHO) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 border-t border-slate-300 pt-2 items-stretch w-full">
             
             {/* TABLA LAVADO DE FILTROS (MÓDULO A Y MÓDULO B) */}
-            <div className="overflow-x-auto shrink-0">
-              <table className="border-collapse border border-slate-400 text-center text-xs w-full">
+            <div className="lg:col-span-5 overflow-x-auto w-full flex flex-col">
+              <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full">
                 <thead>
                   <tr className="bg-cyan-950 text-white font-black tracking-wider border-b border-slate-400">
-                    <th className="border border-slate-400 p-1 uppercase" colSpan={9}>
+                    <th className="border border-slate-400 p-1 text-xs uppercase" colSpan={9}>
                       ESTADO / LAVADO DE FILTROS
                     </th>
                   </tr>
-                  <tr className="bg-cyan-900 text-white font-bold border-b border-slate-400 text-[11px]">
-                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
+                  <tr className="bg-cyan-900 text-white font-bold border-b border-slate-400 text-xs">
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5" rowSpan={2}>HS</th>
                     <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO A</th>
                     <th className="border border-slate-400 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO B</th>
                   </tr>
-                  <tr className="bg-cyan-800 text-white font-bold border-b border-slate-400 text-[11px]">
+                  <tr className="bg-cyan-800 text-white font-bold border-b border-slate-400 text-xs">
                     {ALL_FILTROS.map((f) => (
                       <th 
                         key={f.key} 
-                        className={`border border-slate-400 p-0.5 w-9 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
+                        className={`border border-slate-400 p-0.5 ${f.key === 'MA_F4' ? 'border-r-2 border-r-slate-700' : ''}`}
                       >
                         {f.label}
                       </th>
@@ -861,7 +821,7 @@ export default function PlanillaUnificada24H() {
 
                     return (
                       <tr key={`lavado-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
-                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
+                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold h-6 ${
                           esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
                         }`}>
                           {hs}
@@ -878,7 +838,7 @@ export default function PlanillaUnificada24H() {
                             >
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild disabled={!esDelTurnoActual}>
-                                  <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed">
+                                  <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed text-xs">
                                     {val || '-'}
                                   </button>
                                 </DropdownMenuTrigger>
@@ -905,24 +865,24 @@ export default function PlanillaUnificada24H() {
             </div>
 
             {/* TABLA PURGAS DE SEDIMENTADORES (MÓDULO A Y MÓDULO B) */}
-            <div className="overflow-x-auto shrink-0">
-              <table className="border-collapse border border-slate-400 text-center text-xs w-full">
+            <div className="lg:col-span-3 overflow-x-auto w-full flex flex-col">
+              <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full">
                 <thead>
                   <tr className="bg-amber-950 text-white font-black tracking-wider border-b border-slate-400">
-                    <th className="border border-slate-400 p-1 uppercase" colSpan={5}>
+                    <th className="border border-slate-400 p-1 text-xs uppercase" colSpan={5}>
                       PURGAS DE SEDIMENTADORES
                     </th>
                   </tr>
-                  <tr className="bg-amber-900 text-white font-bold border-b border-slate-400 text-[11px]">
-                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
+                  <tr className="bg-amber-900 text-white font-bold border-b border-slate-400 text-xs">
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5" rowSpan={2}>HS</th>
                     <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO A</th>
                     <th className="border border-slate-400 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO B</th>
                   </tr>
-                  <tr className="bg-amber-800 text-white font-bold border-b border-slate-400 text-[11px]">
+                  <tr className="bg-amber-800 text-white font-bold border-b border-slate-400 text-xs">
                     {ALL_PURGAS.map((s) => (
                       <th 
                         key={s.key} 
-                        className={`border border-slate-400 p-0.5 w-10 ${s.key === 'MA_S2' ? 'border-r-2 border-r-slate-700' : ''}`}
+                        className={`border border-slate-400 p-0.5 ${s.key === 'MA_S2' ? 'border-r-2 border-r-slate-700' : ''}`}
                       >
                         {s.label}
                       </th>
@@ -936,7 +896,7 @@ export default function PlanillaUnificada24H() {
 
                     return (
                       <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
-                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
+                        <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold h-6 ${
                           esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
                         }`}>
                           {hs}
@@ -953,7 +913,7 @@ export default function PlanillaUnificada24H() {
                             >
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild disabled={!esDelTurnoActual}>
-                                  <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed">
+                                  <button className="w-full h-full text-center font-bold outline-none flex items-center justify-center disabled:cursor-not-allowed text-xs">
                                     {val || '-'}
                                   </button>
                                 </DropdownMenuTrigger>
@@ -977,26 +937,26 @@ export default function PlanillaUnificada24H() {
             </div>
 
             {/* OBSERVACIONES GENERALES */}
-            <div className="flex-1 flex flex-col border border-slate-400 rounded overflow-hidden min-w-[280px]">
-              <div className="bg-slate-800 text-white font-bold p-1.5 text-xs text-center border-b border-slate-400 uppercase tracking-wide">
+            <div className="lg:col-span-4 w-full flex flex-col border border-slate-400 rounded overflow-hidden">
+              <div className="bg-slate-800 text-white font-bold p-1 text-xs text-center border-b border-slate-400 uppercase tracking-wide">
                 OBSERVACIONES GENERALES
               </div>
               <textarea
                 value={observacionesGenerales}
                 onChange={(e) => setObservacionesGenerales(e.target.value)}
                 placeholder="Escriba novedades del día, trabajos realizados, observaciones del turno..."
-                className="w-full flex-1 p-2.5 text-xs resize-none border-none outline-none focus:ring-0 text-slate-800 bg-slate-50/50 leading-relaxed min-h-[180px]"
+                className="w-full flex-1 p-2 text-xs resize-none border-none outline-none focus:ring-0 text-slate-800 bg-slate-50/50 leading-relaxed min-h-[160px]"
               />
             </div>
 
           </div>
         </div>
 
-        {/* BOTÓN GUARDAR */}
-        <div className="flex justify-end my-1">
+        {/* BOTÓN GUARDAR (2/3 ANCHO Y CENTRADO) */}
+        <div className="w-full flex justify-center my-2">
           <Button 
             onClick={guardarPlanillaYRegistrar}
-            className="h-8 text-xs bg-blue-700 hover:bg-blue-800 text-white px-5 shadow-sm"
+            className="w-2/3 h-11 text-sm font-bold bg-blue-700 hover:bg-blue-800 text-white shadow-md transition-all rounded-lg"
           >
             Guardar Planilla Completa
           </Button>
