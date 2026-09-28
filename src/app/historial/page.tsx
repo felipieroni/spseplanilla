@@ -7,7 +7,6 @@ export default function HistorialPage() {
   const [historial, setHistorial] = useState<RegistroHistorial[]>([]);
 
   useEffect(() => {
-    // Leemos el historial guardado en el navegador
     const datosGuardados = localStorage.getItem('historial_planillas');
     if (datosGuardados) {
       try {
@@ -18,9 +17,24 @@ export default function HistorialPage() {
     }
   }, []);
 
+  const handleEliminar = (id: string) => {
+    const registro = historial.find((r) => r.id === id);
+    if (!registro) return;
+
+    const confirmar = window.confirm(
+      `🗑️ ¿Estás seguro/a de que deseas borrar este registro?\n\nFecha: ${registro.fecha}\nTurno: ${registro.turno}\nOperador: ${registro.operador}`
+    );
+
+    if (!confirmar) return;
+
+    const nuevoHistorial = historial.filter((item) => item.id !== id);
+    setHistorial(nuevoHistorial);
+    localStorage.setItem('historial_planillas', JSON.stringify(nuevoHistorial));
+  };
+
   return (
     <div className="container mx-auto">
-      <HistorialPlanillas historial={historial} />
+      <HistorialPlanillas historial={historial} onEliminar={handleEliminar} />
     </div>
   );
 }

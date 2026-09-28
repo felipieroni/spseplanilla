@@ -17,9 +17,9 @@ export interface RegistroHistorial {
   bombasEstado?: Record<string, Record<string, string>>;
 }
 
-const HORARIOS = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
+const HORARIOS_IMPARES = ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23'];
+const HORARIOS_PARES   = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
 
-// ESTRUCTURA EN MÓDULO A Y MÓDULO B SINCRONIZADA CON LA PÁGINA PRINCIPAL
 const FILTROS_MODULO_A = [
   { key: 'MA_F1', label: 'F1' },
   { key: 'MA_F2', label: 'F2' },
@@ -46,9 +46,10 @@ const PURGAS_MODULO_B = [
 
 interface Props {
   historial?: RegistroHistorial[];
+  onEliminar?: (id: string) => void;
 }
 
-export default function HistorialPlanillas({ historial = [] }: Props) {
+export default function HistorialPlanillas({ historial = [], onEliminar }: Props) {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [registroSeleccionado, setRegistroSeleccionado] = useState<RegistroHistorial | null>(null);
 
@@ -56,15 +57,16 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
     ? historial.filter((h) => h.fecha === filtroFecha)
     : historial;
 
-  // FUNCIÓN EXPORTAR A EXCEL CON MÓDULO A Y MÓDULO B
   const exportarPlanillaAExcel = (registro: RegistroHistorial) => {
-    const datosFilas = HORARIOS.map((hs) => {
-      const p = registro.parametros?.[hs] || {};
-      const f = registro.filtrosEstado?.[hs] || {};
-      const purg = registro.purgasEstado?.[hs] || {};
+    const datosFilas = HORARIOS_IMPARES.map((hsImp, idx) => {
+      const hsPar = HORARIOS_PARES[idx];
+      const p = registro.parametros?.[hsPar] || registro.parametros?.[hsImp] || {};
+      const f = registro.filtrosEstado?.[hsImp] || registro.filtrosEstado?.[hsPar] || {};
+      const purg = registro.purgasEstado?.[hsPar] || registro.purgasEstado?.[hsImp] || {};
 
       return {
-        Hora: `${hs}:00`,
+        'Hora Filtros': `${hsImp}:00`,
+        'Hora Parámetros': `${hsPar}:00`,
         'Caudal (m³/h)': p.caudal || '-',
         'Turb. Cruda': p.turbCruda || '-',
         'pH Cruda': p.phCruda || '-',
@@ -76,23 +78,19 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
         'pH CAF': p.phCaf || '-',
         'Cloro (ppm)': p.cloro || '-',
         
-        // MÓDULO A - FILTROS (con fallback a registros viejos M1/F1..F4)
         'Módulo A - F1 (Filtro)': f.MA_F1 || f.M1_F1 || f.F1 || '-',
         'Módulo A - F2 (Filtro)': f.MA_F2 || f.M1_F2 || f.F2 || '-',
         'Módulo A - F3 (Filtro)': f.MA_F3 || f.M1_F3 || f.F3 || '-',
         'Módulo A - F4 (Filtro)': f.MA_F4 || f.M1_F4 || f.F4 || '-',
 
-        // MÓDULO B - FILTROS (con fallback a registros viejos M2/F5/F6)
         'Módulo B - F1 (Filtro)': f.MB_F1 || f.M2_F1 || f.F5 || '-',
         'Módulo B - F2 (Filtro)': f.MB_F2 || f.M2_F2 || f.F6 || '-',
         'Módulo B - F3 (Filtro)': f.MB_F3 || f.M2_F3 || '-',
         'Módulo B - F4 (Filtro)': f.MB_F4 || f.M2_F4 || '-',
 
-        // MÓDULO A - PURGAS
         'Módulo A - S1 (Purga)': purg.MA_S1 || purg.M1_S1 || purg.S1 || '-',
         'Módulo A - S2 (Purga)': purg.MA_S2 || purg.M1_S2 || purg.S2 || '-',
 
-        // MÓDULO B - PURGAS
         'Módulo B - S1 (Purga)': purg.MB_S1 || purg.M2_S1 || purg.S3 || '-',
         'Módulo B - S2 (Purga)': purg.MB_S2 || purg.M2_S2 || purg.S4 || '-',
       };
@@ -102,14 +100,14 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
     const worksheet = XLSX.utils.json_to_sheet(datosFilas, { origin: "A5" } as any);
     
     XLSX.utils.sheet_add_aoa(worksheet, [
-      ["PLANILLA DE CONTROL DE PLANTA POTABILIZADORA - HISTORIAL"],
-      [`Fecha: ${registro.fecha}`, `Turno: ${registro.turno}`, `Operador: ${registro.operador}`],
+      ["PLANILLA DE CONTROL DE PLANTA POTABILIZADORA - HISTORIAL DIARIO"],
+      [`Fecha: ${registro.fecha}`, `Operadores: ${registro.operador}`],
       [`Observaciones: ${registro.observaciones}`],
       []
     ], { origin: "A1" });
 
     XLSX.utils.book_append_sheet(workbook, worksheet, "Planilla Control");
-    XLSX.writeFile(workbook, `Planilla_${registro.fecha}_Turno_${registro.turno.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+    XLSX.writeFile(workbook, `Planilla_${registro.fecha}.xlsx`);
   };
 
   return (
@@ -117,7 +115,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
       <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-800">
-            Historial de Planillas Registradas
+            Historial de Planillas Diarias Registradas
           </h2>
           <p className="text-slate-500 text-xs">
             Consulte mediciones, estados de lavado de filtros, purgas y exporte a Excel.
@@ -150,8 +148,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
             <thead className="bg-slate-200 text-slate-800 font-bold border-b">
               <tr>
                 <th className="p-3 border-r">Fecha</th>
-                <th className="p-3 border-r">Turno</th>
-                <th className="p-3 border-r">Operador</th>
+                <th className="p-3 border-r">Operadores del Día</th>
                 <th className="p-3 border-r">Observaciones</th>
                 <th className="p-3 text-center">Acciones</th>
               </tr>
@@ -161,7 +158,6 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                 historialFiltrado.map((reg) => (
                   <tr key={reg.id} className="border-b hover:bg-slate-50 transition-colors">
                     <td className="p-3 font-mono font-bold text-slate-800 border-r">{reg.fecha}</td>
-                    <td className="p-3 border-r font-medium text-slate-700">{reg.turno}</td>
                     <td className="p-3 border-r font-bold text-slate-900">{reg.operador}</td>
                     <td className="p-3 border-r text-slate-600 truncate max-w-xs">{reg.observaciones}</td>
                     <td className="p-3 text-center flex justify-center gap-2">
@@ -178,12 +174,19 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                       >
                         Excel
                       </Button>
+                      <Button
+                        onClick={() => onEliminar?.(reg.id)}
+                        variant="destructive"
+                        className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold"
+                      >
+                        🗑️ Borrar
+                      </Button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center text-slate-400 italic">
+                  <td colSpan={4} className="p-6 text-center text-slate-400 italic">
                     No hay planillas cargadas en el historial aún.
                   </td>
                 </tr>
@@ -192,16 +195,15 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
           </table>
         </div>
       ) : (
-        /* VISTA DETALLADA COMPLETA CON ESTRUCTURA DE MÓDULO A Y MÓDULO B */
         <div className="bg-white border rounded-xl shadow-sm p-4 flex flex-col gap-5">
           <div className="flex justify-between items-center border-b pb-3">
             <div>
-              <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">Planilla de Control</span>
+              <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">Planilla de Control Diaria</span>
               <h3 className="text-lg font-extrabold text-slate-900">
-                {registroSeleccionado.fecha} — Turno: {registroSeleccionado.turno}
+                Fecha: {registroSeleccionado.fecha}
               </h3>
               <p className="text-xs text-slate-600">
-                Operador: <strong className="text-slate-800">{registroSeleccionado.operador}</strong>
+                Operadores del Día: <strong className="text-slate-800">{registroSeleccionado.operador}</strong>
               </p>
             </div>
             <div className="flex gap-2">
@@ -242,7 +244,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {HORARIOS.map((hs) => {
+                  {HORARIOS_PARES.map((hs) => {
                     const p = registroSeleccionado.parametros?.[hs] || {};
                     const registrado = Object.keys(p).length > 0;
                     return (
@@ -266,10 +268,10 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
             </div>
           </div>
 
-          {/* BLOQUE SECUNDARIO: LAVADO DE FILTROS Y PURGAS EN MÓDULO A Y MÓDULO B */}
+          {/* LAVADO DE FILTROS Y PURGAS */}
           <div className="grid md:grid-cols-2 gap-4">
             
-            {/* SECCIÓN FILTROS (MÓDULO A Y MÓDULO B) */}
+            {/* SECCIÓN FILTROS (MÓDULOS A Y B - ITERACIÓN EN HORARIOS IMPARES) */}
             <div className="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
@@ -293,8 +295,10 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {HORARIOS.map((hs) => {
-                      const f = registroSeleccionado.filtrosEstado?.[hs] || {};
+                    {HORARIOS_IMPARES.map((hs, idx) => {
+                      const hsPar = HORARIOS_PARES[idx];
+                      const f = registroSeleccionado.filtrosEstado?.[hs] || registroSeleccionado.filtrosEstado?.[hsPar] || {};
+                      
                       return (
                         <tr key={hs} className="border-b">
                           <td className="p-1 border font-mono font-bold bg-slate-50">{hs}</td>
@@ -303,11 +307,20 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                           {FILTROS_MODULO_A.map((item) => {
                             const val = f[item.key] || f[`M1_${item.label}`] || f[item.label] || '-';
                             const esLavado = val === 'L' || val === 'Lavado';
+                            const esFueraServicio = val === '/';
+                            const esMarcha = val === 'M';
+
                             return (
                               <td
                                 key={item.key}
                                 className={`p-1 border font-bold ${
-                                  esLavado ? 'bg-sky-200 text-sky-900 font-extrabold' : 'text-slate-600'
+                                  esLavado 
+                                    ? 'bg-red-400 text-black font-extrabold' 
+                                    : esFueraServicio 
+                                    ? 'bg-slate-300 text-slate-800 font-bold' 
+                                    : esMarcha 
+                                    ? 'bg-emerald-100 text-emerald-950' 
+                                    : 'text-slate-600'
                                 }`}
                               >
                                 {val}
@@ -316,15 +329,24 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                           })}
 
                           {/* Módulo B */}
-                          {FILTROS_MODULO_B.map((item, idx) => {
-                            const fallbackOld = idx === 0 ? 'F5' : idx === 1 ? 'F6' : '';
+                          {FILTROS_MODULO_B.map((item, idxB) => {
+                            const fallbackOld = idxB === 0 ? 'F5' : idxB === 1 ? 'F6' : '';
                             const val = f[item.key] || f[`M2_${item.label}`] || (fallbackOld ? f[fallbackOld] : '') || '-';
                             const esLavado = val === 'L' || val === 'Lavado';
+                            const esFueraServicio = val === '/';
+                            const esMarcha = val === 'M';
+
                             return (
                               <td
                                 key={item.key}
                                 className={`p-1 border font-bold ${
-                                  esLavado ? 'bg-sky-200 text-sky-900 font-extrabold' : 'text-slate-600'
+                                  esLavado 
+                                    ? 'bg-red-400 text-black font-extrabold' 
+                                    : esFueraServicio 
+                                    ? 'bg-slate-300 text-slate-800 font-bold' 
+                                    : esMarcha 
+                                    ? 'bg-emerald-100 text-emerald-950' 
+                                    : 'text-slate-600'
                                 }`}
                               >
                                 {val}
@@ -339,7 +361,7 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
               </div>
             </div>
 
-            {/* SECCIÓN PURGAS (MÓDULO A Y MÓDULO B) */}
+            {/* SECCIÓN PURGAS (MÓDULOS A Y B - ITERACIÓN EN HORARIOS PARES) */}
             <div className="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
@@ -363,8 +385,10 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {HORARIOS.map((hs) => {
-                      const purg = registroSeleccionado.purgasEstado?.[hs] || {};
+                    {HORARIOS_PARES.map((hs, idx) => {
+                      const hsImp = HORARIOS_IMPARES[idx];
+                      const purg = registroSeleccionado.purgasEstado?.[hs] || registroSeleccionado.purgasEstado?.[hsImp] || {};
+
                       return (
                         <tr key={hs} className="border-b">
                           <td className="p-1 border font-mono font-bold bg-slate-50">{hs}</td>
@@ -373,11 +397,17 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                           {PURGAS_MODULO_A.map((item) => {
                             const val = purg[item.key] || purg[`M1_${item.label}`] || purg[item.label] || '-';
                             const esPurga = val === 'P' || val === 'Purga';
+                            const esFueraServicio = val === '/';
+
                             return (
                               <td
                                 key={item.key}
                                 className={`p-1 border font-bold ${
-                                  esPurga ? 'bg-amber-200 text-amber-900 font-extrabold' : 'text-slate-600'
+                                  esPurga 
+                                    ? 'bg-amber-300 text-amber-950 font-extrabold' 
+                                    : esFueraServicio 
+                                    ? 'bg-slate-300 text-slate-800 font-bold' 
+                                    : 'text-slate-600'
                                 }`}
                               >
                                 {val}
@@ -386,15 +416,21 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
                           })}
 
                           {/* Purgas Módulo B */}
-                          {PURGAS_MODULO_B.map((item, idx) => {
-                            const fallbackOld = idx === 0 ? 'S3' : 'S4';
+                          {PURGAS_MODULO_B.map((item, idxB) => {
+                            const fallbackOld = idxB === 0 ? 'S3' : 'S4';
                             const val = purg[item.key] || purg[`M2_${item.label}`] || purg[fallbackOld] || '-';
                             const esPurga = val === 'P' || val === 'Purga';
+                            const esFueraServicio = val === '/';
+
                             return (
                               <td
                                 key={item.key}
                                 className={`p-1 border font-bold ${
-                                  esPurga ? 'bg-amber-200 text-amber-900 font-extrabold' : 'text-slate-600'
+                                  esPurga 
+                                    ? 'bg-amber-300 text-amber-950 font-extrabold' 
+                                    : esFueraServicio 
+                                    ? 'bg-slate-300 text-slate-800 font-bold' 
+                                    : 'text-slate-600'
                                 }`}
                               >
                                 {val}
@@ -411,9 +447,8 @@ export default function HistorialPlanillas({ historial = [] }: Props) {
 
           </div>
 
-          {/* OBSERVACIONES DEL TURNO */}
           <div className="bg-slate-50 p-3 border rounded-lg">
-            <h4 className="font-bold text-slate-700 text-xs mb-1">Observaciones del Turno:</h4>
+            <h4 className="font-bold text-slate-700 text-xs mb-1">Observaciones Generales del Día:</h4>
             <p className="text-slate-800 text-xs leading-relaxed">{registroSeleccionado.observaciones}</p>
           </div>
         </div>

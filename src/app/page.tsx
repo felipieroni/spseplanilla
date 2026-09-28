@@ -17,9 +17,17 @@ import {
 } from "@/components/ui/dialog";
 import { useOperador } from '@/context/operador-context';
 
-const HORARIOS = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
+const HORARIOS_IMPARES = ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23'];
+const HORARIOS_PARES   = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
 
-const MAPA_TURNOS: Record<string, string[]> = {
+const MAPA_TURNOS_IMPARES: Record<string, string[]> = {
+  '00:00 a 06:00': ['01', '03', '05'],
+  '06:00 a 12:00': ['07', '09', '11'],
+  '12:00 a 18:00': ['13', '15', '17'],
+  '18:00 a 00:00': ['19', '21', '23'],
+};
+
+const MAPA_TURNOS_PARES: Record<string, string[]> = {
   '00:00 a 06:00': ['00', '02', '04'],
   '06:00 a 12:00': ['06', '08', '10'],
   '12:00 a 18:00': ['12', '14', '16'],
@@ -87,7 +95,7 @@ export default function PlanillaUnificada24H() {
   const { operadorActual } = useOperador();
 
   // ESTADO DE TURNO
-  const [turnoActivo, setTurnoActivo] = useState('06:00 a 12:00');
+  const [turnoActivo, setTurnoActivo] = useState('00:00 a 06:00');
   
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
 
@@ -102,62 +110,60 @@ export default function PlanillaUnificada24H() {
   const [filtroFechaHistorial, setFiltroFechaHistorial] = useState('');
   const [historial, setHistorial] = useState<RegistroHistorial[]>([]);
 
-  // CARGA INICIAL DE LOCALSTORAGE AL MONTAR
+  // CARGAR DATOS DE UNA FECHA ESPECÍFICA
+  const cargarDatosDeFecha = (fechaSeleccionada: string, listaHistorial: RegistroHistorial[]) => {
+    const registro = listaHistorial.find((r) => r.fecha === fechaSeleccionada);
+    if (registro) {
+      setParametros(registro.parametros || {});
+      setFiltrosEstado(registro.filtrosEstado || {});
+      setPurgasEstado(registro.purgasEstado || {});
+      setBombasEstado(registro.bombasEstado || {});
+      setObservacionesGenerales(registro.observaciones || '');
+    } else {
+      setParametros({});
+      setFiltrosEstado({});
+      setPurgasEstado({});
+      setBombasEstado({});
+      setObservacionesGenerales('');
+    }
+  };
+
+  // CARGA INICIAL
   useEffect(() => {
     setIsMounted(true);
 
     const borradorTurno = localStorage.getItem('borrador_turno_activo');
     if (borradorTurno) setTurnoActivo(borradorTurno);
 
-    const borradorParametros = localStorage.getItem('borrador_parametros');
-    if (borradorParametros) setParametros(JSON.parse(borradorParametros));
-
-    const borradorFiltros = localStorage.getItem('borrador_filtros');
-    if (borradorFiltros) setFiltrosEstado(JSON.parse(borradorFiltros));
-
-    const borradorPurgas = localStorage.getItem('borrador_purgas');
-    if (borradorPurgas) setPurgasEstado(JSON.parse(borradorPurgas));
-
-    const borradorBombas = localStorage.getItem('borrador_bombas');
-    if (borradorBombas) setBombasEstado(JSON.parse(borradorBombas));
-
-    const borradorObs = localStorage.getItem('borrador_observaciones');
-    if (borradorObs) setObservacionesGenerales(borradorObs);
+    const hoy = new Date();
+    const año = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const fechaHoy = `${año}-${mes}-${dia}`;
+    setFecha(fechaHoy);
 
     const datosGuardados = localStorage.getItem('historial_planillas');
+    let historialCargado: RegistroHistorial[] = [];
     if (datosGuardados) {
       try {
-        setHistorial(JSON.parse(datosGuardados));
+        historialCargado = JSON.parse(datosGuardados);
+        setHistorial(historialCargado);
       } catch (e) {
         console.error("Error al parsear el historial de localStorage", e);
       }
     }
+
+    cargarDatosDeFecha(fechaHoy, historialCargado);
   }, []);
 
-  // Guardado automático del borrador en tiempo real
+  const handleFechaChange = (nuevaFecha: string) => {
+    setFecha(nuevaFecha);
+    cargarDatosDeFecha(nuevaFecha, historial);
+  };
+
   useEffect(() => {
     if (isMounted) localStorage.setItem('borrador_turno_activo', turnoActivo);
   }, [turnoActivo, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_parametros', JSON.stringify(parametros));
-  }, [parametros, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_filtros', JSON.stringify(filtrosEstado));
-  }, [filtrosEstado, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_purgas', JSON.stringify(purgasEstado));
-  }, [purgasEstado, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_bombas', JSON.stringify(bombasEstado));
-  }, [bombasEstado, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('borrador_observaciones', observacionesGenerales);
-  }, [observacionesGenerales, isMounted]);
 
   // Reloj
   useEffect(() => {
@@ -167,35 +173,41 @@ export default function PlanillaUnificada24H() {
       const mins = String(ahora.getMinutes()).padStart(2, '0');
       const segs = String(ahora.getSeconds()).padStart(2, '0');
       setHoraActualSistema(`${hs}:${mins}:${segs}`);
-
-      if (!fecha) {
-        const año = ahora.getFullYear();
-        const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-        const dia = String(ahora.getDate()).padStart(2, '0');
-        setFecha(`${año}-${mes}-${dia}`);
-      }
     };
 
     actualizarReloj();
     const interval = setInterval(actualizarReloj, 1000);
     return () => clearInterval(interval);
-  }, [fecha]);
+  }, []);
 
-  // ALGORITMO PRECISO: OBTENER FILTRO(S) CON MÁS TIEMPO SIN LAVAR POR HORAS Y MÓDULO INDEPENDIENTE
+  const horasTurnoImpares = MAPA_TURNOS_IMPARES[turnoActivo] || [];
+  const horasTurnoPares   = MAPA_TURNOS_PARES[turnoActivo] || [];
+
+  // RECOMENDACIÓN DINÁMICA: EVALÚA FUERA DE SERVICIO SOLO EN EL TURNO ACTIVO
   const obtenerFiltrosRecomendadosPorModulo = (listaFiltros: typeof FILTROS_MODULO_A) => {
+    // Un filtro está "Fuera de Servicio" solo si tiene una '/' asignada en las horas del TURNO ACTIVO
+    const filtrosActivos = listaFiltros.filter((f) => {
+      const estaFueraDeServicioEnTurnoActivo = horasTurnoImpares.some(
+        (hs) => filtrosEstado[hs]?.[f.key] === '/'
+      );
+      return !estaFueraDeServicioEnTurnoActivo;
+    });
+
+    if (filtrosActivos.length === 0) return [];
+
     const ultimoPasoLavado: Record<string, number> = {};
 
-    listaFiltros.forEach((f) => {
+    filtrosActivos.forEach((f) => {
       ultimoPasoLavado[f.key] = -Infinity;
     });
 
     // 1. Revisar la planilla activa en tiempo real
     Object.entries(filtrosEstado || {}).forEach(([hs, hsData]) => {
       if (!hsData) return;
-      const hIndex = HORARIOS.indexOf(hs);
+      const hIndex = HORARIOS_IMPARES.indexOf(hs);
       if (hIndex === -1) return;
 
-      listaFiltros.forEach((f) => {
+      filtrosActivos.forEach((f) => {
         if (hsData[f.key] === 'L') {
           if (hIndex > ultimoPasoLavado[f.key]) {
             ultimoPasoLavado[f.key] = hIndex;
@@ -204,20 +216,20 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 2. Revisar el historial guardado
+    // 2. Revisar el historial guardado de días anteriores
     historial.forEach((registro, idx) => {
       if (!registro.filtrosEstado) return;
       
-      const offsetRegistro = -(idx + 1) * HORARIOS.length;
+      const offsetRegistro = -(idx + 1) * HORARIOS_IMPARES.length;
 
       Object.entries(registro.filtrosEstado).forEach(([hs, hsData]) => {
         if (!hsData) return;
-        const hIndex = HORARIOS.indexOf(hs);
+        const hIndex = HORARIOS_IMPARES.indexOf(hs);
         if (hIndex === -1) return;
 
         const pasoGlobal = offsetRegistro + hIndex;
 
-        listaFiltros.forEach((f) => {
+        filtrosActivos.forEach((f) => {
           if (hsData[f.key] === 'L') {
             if (pasoGlobal > ultimoPasoLavado[f.key]) {
               ultimoPasoLavado[f.key] = pasoGlobal;
@@ -227,21 +239,16 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 3. Buscar el valor MÍNIMO de paso de lavado
+    // 3. Buscar el MÍNIMO paso de lavado entre los filtros actualmente operativos
     let minPaso = Infinity;
-    listaFiltros.forEach((f) => {
+    filtrosActivos.forEach((f) => {
       if (ultimoPasoLavado[f.key] < minPaso) {
         minPaso = ultimoPasoLavado[f.key];
       }
     });
 
-    const recomendados = listaFiltros.filter((f) => ultimoPasoLavado[f.key] === minPaso);
-
-    if (recomendados.length === listaFiltros.length) {
-      return listaFiltros.slice(0, 1);
-    }
-
-    return recomendados;
+    // Devuelve todos los filtros empatados con el mayor tiempo transcurrido sin lavar
+    return filtrosActivos.filter((f) => ultimoPasoLavado[f.key] === minPaso);
   };
 
   const recomendadosModuloA = obtenerFiltrosRecomendadosPorModulo(FILTROS_MODULO_A);
@@ -263,54 +270,72 @@ export default function PlanillaUnificada24H() {
     }
   };
 
-  // GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL
+  // GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL (FUSIONA POR DÍA ÚNICO)
   const guardarPlanillaYRegistrar = () => {
-    const nuevoRegistro: RegistroHistorial = {
-      id: Date.now().toString(),
-      fecha: fecha || new Date().toISOString().split('T')[0],
-      turno: turnoActivo,
-      operador: operadorActual || 'SIN REGISTRAR',
-      observaciones: observacionesGenerales || 'Sin observaciones registradas.',
-      descargado: false,
-      parametros: JSON.parse(JSON.stringify(parametros)),
-      filtrosEstado: JSON.parse(JSON.stringify(filtrosEstado)),
-      purgasEstado: JSON.parse(JSON.stringify(purgasEstado)),
-      bombasEstado: JSON.parse(JSON.stringify(bombasEstado)),
-    };
+    const fechaGuardar = fecha || new Date().toISOString().split('T')[0];
+    const indexExistente = historial.findIndex((r) => r.fecha === fechaGuardar);
 
-    const nuevoHistorial = [nuevoRegistro, ...historial];
+    let nuevoHistorial: RegistroHistorial[];
+
+    if (indexExistente !== -1) {
+      const regPrevio = historial[indexExistente];
+
+      const operadoresList = regPrevio.operador ? regPrevio.operador.split(' / ') : [];
+      if (operadorActual && !operadoresList.includes(operadorActual)) {
+        operadoresList.push(operadorActual);
+      }
+      const operadorFinal = operadoresList.length > 0 ? operadoresList.join(' / ') : (operadorActual || 'SIN REGISTRAR');
+
+      const registroActualizado: RegistroHistorial = {
+        ...regPrevio,
+        fecha: fechaGuardar,
+        turno: turnoActivo,
+        operador: operadorFinal,
+        observaciones: observacionesGenerales || regPrevio.observaciones,
+        descargado: false,
+        parametros: { ...(regPrevio.parametros || {}), ...parametros },
+        filtrosEstado: { ...(regPrevio.filtrosEstado || {}), ...filtrosEstado },
+        purgasEstado: { ...(regPrevio.purgasEstado || {}), ...purgasEstado },
+        bombasEstado: { ...(regPrevio.bombasEstado || {}), ...bombasEstado },
+      };
+
+      nuevoHistorial = [...historial];
+      nuevoHistorial[indexExistente] = registroActualizado;
+    } else {
+      const nuevoRegistro: RegistroHistorial = {
+        id: Date.now().toString(),
+        fecha: fechaGuardar,
+        turno: turnoActivo,
+        operador: operadorActual || 'SIN REGISTRAR',
+        observaciones: observacionesGenerales || 'Sin observaciones registradas.',
+        descargado: false,
+        parametros: JSON.parse(JSON.stringify(parametros)),
+        filtrosEstado: JSON.parse(JSON.stringify(filtrosEstado)),
+        purgasEstado: JSON.parse(JSON.stringify(purgasEstado)),
+        bombasEstado: JSON.parse(JSON.stringify(bombasEstado)),
+      };
+
+      nuevoHistorial = [nuevoRegistro, ...historial];
+    }
+
     setHistorial(nuevoHistorial);
     localStorage.setItem('historial_planillas', JSON.stringify(nuevoHistorial));
 
-    // Limpiar borrador local
-    setParametros({});
-    setFiltrosEstado({});
-    setPurgasEstado({});
-    setBombasEstado({});
-    setObservacionesGenerales('');
-
-    localStorage.removeItem('borrador_parametros');
-    localStorage.removeItem('borrador_filtros');
-    localStorage.removeItem('borrador_purgas');
-    localStorage.removeItem('borrador_bombas');
-    localStorage.removeItem('borrador_observaciones');
-
-    alert('¡Planilla guardada exitosamente en el historial!');
+    alert(`¡Planilla diaria del ${fechaGuardar} guardada/actualizada con éxito!`);
   };
 
-  // ELIMINAR REGISTRO INDIVIDUAL CON ADVERTENCIA DE DESCARGA
   const eliminarRegistroHistorial = (id: string) => {
     const registro = historial.find((r) => r.id === id);
     if (!registro) return;
 
     if (!registro.descargado) {
       const confirmarSinDescargar = window.confirm(
-        `⚠️ ¡ATENCIÓN!\n\nEste registro (${registro.fecha} - ${registro.turno}) TODAVÍA NO HA SIDO DESCARGADO/GUARDADO externamente.\n\n¿Estás seguro/a de que deseas borrarlo definitivamente?`
+        `⚠️ ¡ATENCIÓN!\n\nEste registro (${registro.fecha}) TODAVÍA NO HA SIDO DESCARGADO/GUARDADO externamente.\n\n¿Estás seguro/a de que deseas borrarlo definitivamente?`
       );
       if (!confirmarSinDescargar) return;
     } else {
       const confirmarBorrado = window.confirm(
-        `¿Confirmas borrar el registro del ${registro.fecha} - ${registro.turno}?`
+        `¿Confirmas borrar el registro del día ${registro.fecha}?`
       );
       if (!confirmarBorrado) return;
     }
@@ -318,19 +343,25 @@ export default function PlanillaUnificada24H() {
     const nuevoHistorial = historial.filter((r) => r.id !== id);
     setHistorial(nuevoHistorial);
     localStorage.setItem('historial_planillas', JSON.stringify(nuevoHistorial));
+
+    if (registro.fecha === fecha) {
+      setParametros({});
+      setFiltrosEstado({});
+      setPurgasEstado({});
+      setBombasEstado({});
+      setObservacionesGenerales('');
+    }
   };
 
-  // SIMULAR/REALIZAR DESCARGA DE REGISTRO
   const descargarRegistro = (reg: RegistroHistorial) => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reg, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `planilla_${reg.fecha}_${reg.turno.replace(/\s+/g, '_')}.json`);
+    downloadAnchor.setAttribute("download", `planilla_${reg.fecha}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
 
-    // Marcar como descargado
     const nuevoHistorial = historial.map((r) => {
       if (r.id === reg.id) return { ...r, descargado: true };
       return r;
@@ -423,8 +454,6 @@ export default function PlanillaUnificada24H() {
 
   if (!isMounted) return null;
 
-  const horasTurnoActual = MAPA_TURNOS[turnoActivo] || [];
-
   const historialFiltrado = filtroFechaHistorial 
     ? historial.filter(h => h.fecha === filtroFechaHistorial)
     : historial;
@@ -432,12 +461,12 @@ export default function PlanillaUnificada24H() {
   return (
     <div className="min-h-screen w-full bg-slate-100 flex flex-col text-xs overflow-y-auto">
 
-      {/* MODAL HISTORIAL DE REGISTROS */}
+      {/* MODAL HISTORIAL DE REGISTROS DIARIOS */}
       <Dialog open={modalHistorialAbierto} onOpenChange={setModalHistorialAbierto}>
         <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-800">
-              Historial de Planillas Registradas
+              Historial de Planillas Diarias Registradas
             </DialogTitle>
           </DialogHeader>
 
@@ -462,7 +491,7 @@ export default function PlanillaUnificada24H() {
             </div>
 
             <span className="text-xs text-slate-500 font-medium">
-              Mostrando {historialFiltrado.length} registros
+              Mostrando {historialFiltrado.length} archivos diarios
             </span>
           </div>
 
@@ -471,8 +500,8 @@ export default function PlanillaUnificada24H() {
               <thead className="bg-slate-100 sticky top-0 border-b font-bold text-slate-700 z-10">
                 <tr>
                   <th className="p-2 border-r">Fecha</th>
-                  <th className="p-2 border-r">Turno</th>
-                  <th className="p-2 border-r">Operador</th>
+                  <th className="p-2 border-r">Último Turno</th>
+                  <th className="p-2 border-r">Operadores del Día</th>
                   <th className="p-2 border-r text-center">Lavados</th>
                   <th className="p-2 border-r text-center">Purgas</th>
                   <th className="p-2 border-r text-center">Estado Guardado</th>
@@ -534,7 +563,7 @@ export default function PlanillaUnificada24H() {
                 ) : (
                   <tr>
                     <td colSpan={8} className="p-4 text-center text-slate-400 italic">
-                      No hay registros guardados.
+                      No hay registros diarios guardados.
                     </td>
                   </tr>
                 )}
@@ -552,7 +581,7 @@ export default function PlanillaUnificada24H() {
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="p-2 flex flex-col gap-2">
-        {/* SUB-HEADER CON OPCIONES DE TURNO CENTRADAS */}
+        {/* SUB-HEADER CON SELECCIÓN DE TURNO Y FECHA DIARIA */}
         <div className="flex flex-wrap justify-between items-center bg-white p-2 rounded shadow-sm border gap-2">
           <h1 className="font-bold text-sm text-slate-800 shrink-0">
             Planilla Control Planta Potabilizadora SPSE
@@ -561,7 +590,7 @@ export default function PlanillaUnificada24H() {
           <div className="flex-1 flex justify-center">
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border">
               <span className="text-xs font-semibold text-slate-500 px-1">Turno:</span>
-              {Object.keys(MAPA_TURNOS).map((t) => (
+              {Object.keys(MAPA_TURNOS_PARES).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTurnoActivo(t)}
@@ -580,20 +609,20 @@ export default function PlanillaUnificada24H() {
             <input 
               type="date" 
               value={fecha} 
-              onChange={(e) => setFecha(e.target.value)} 
+              onChange={(e) => handleFechaChange(e.target.value)} 
               className="h-7 w-36 text-xs bg-white border rounded px-2" 
             />
           </div>
         </div>
 
-        {/* TABLA DE PARÁMETROS COMPLETA */}
+        {/* TABLA DE PARÁMETROS SUPERIOR */}
         <div className="bg-white border rounded shadow-sm p-2 flex flex-col gap-3">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse border-2 border-slate-600 text-center text-xs">
               <thead>
                 <tr className="bg-slate-300 font-bold border-b-2 border-slate-600">
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1 w-8" rowSpan={2}>HS</th>
-                  <th className="border border-slate-400 p-1" colSpan={4}>EBAC</th>
+                  <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1" colSpan={4}>EBAC</th>
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1 w-16" rowSpan={2}>NIVEL POZO<br/><span className="text-[9px] font-normal">(m)</span></th>
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1" colSpan={3}>AGUA CRUDA</th>
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1" colSpan={2}>DOSIFICACIÓN PAC 10</th>
@@ -604,11 +633,13 @@ export default function PlanillaUnificada24H() {
                 </tr>
 
                 <tr className="bg-slate-100 font-bold border-b-2 border-slate-600 text-[11px]">
+                  {/* SUB-CABECERAS EBAC */}
                   <th className="border border-slate-400 p-1 w-7">B1</th>
                   <th className="border border-slate-400 p-1 w-7">B2</th>
                   <th className="border border-slate-400 p-1 w-7">B3</th>
-                  <th className="border border-slate-400 p-1 w-7">B4</th>
+                  <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1 w-7">B4</th>
 
+                  {/* SUB-CABECERAS PARÁMETROS */}
                   <th className="border border-slate-400 p-1">CAUDAL<br/><span className="text-[9px] font-normal">(m³/h)</span></th>
                   <th className="border border-slate-400 p-1">TURB.<br/><span className="text-[9px] font-normal">(NTU)</span></th>
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1">pH</th>
@@ -622,6 +653,7 @@ export default function PlanillaUnificada24H() {
                   <th className="border border-slate-400 p-1">TURB.<br/><span className="text-[9px] font-normal">(NTU)</span></th>
                   <th className="border border-slate-400 border-r-2 border-r-slate-700 p-1">pH</th>
 
+                  {/* SUB-CABECERAS EBAP */}
                   <th className="border border-slate-400 p-1 w-7">B1</th>
                   <th className="border border-slate-400 p-1 w-7">B2</th>
                   <th className="border border-slate-400 p-1 w-7">B3</th>
@@ -629,8 +661,8 @@ export default function PlanillaUnificada24H() {
                 </tr>
               </thead>
               <tbody>
-                {HORARIOS.map((hs) => {
-                  const esDelTurnoActual = horasTurnoActual.includes(hs);
+                {HORARIOS_PARES.map((hs) => {
+                  const esDelTurnoActual = horasTurnoPares.includes(hs);
                   const datosHs = parametros[hs] || {};
                   const bombasHs = bombasEstado[hs] || {};
 
@@ -641,18 +673,20 @@ export default function PlanillaUnificada24H() {
                         esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'
                       }`}
                     >
+                      {/* HORARIO (PARES) */}
                       <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
                         esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
                       }`}>
                         {hs}
                       </td>
 
-                      {['ebac_b1', 'ebac_b2', 'ebac_b3', 'ebac_b4'].map((bKey) => {
+                      {/* 1. BOMBAS EBAC */}
+                      {['ebac_b1', 'ebac_b2', 'ebac_b3', 'ebac_b4'].map((bKey, bIdx) => {
                         const val = bombasHs[bKey] || '';
                         return (
                           <td 
                             key={bKey} 
-                            className={`border border-slate-400 p-0 transition-colors ${
+                            className={`border border-slate-400 p-0 transition-colors ${bIdx === 3 ? 'border-r-2 border-r-slate-700' : ''} ${
                               val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === 'P' ? 'bg-rose-200 font-bold text-rose-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                             }`}
                           >
@@ -681,6 +715,7 @@ export default function PlanillaUnificada24H() {
                         );
                       })}
 
+                      {/* 2. NIVEL POZO */}
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -694,6 +729,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
                       
+                      {/* 3. AGUA CRUDA */}
                       <td className="border border-slate-400 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -731,6 +767,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
                       
+                      {/* 4. DOSIFICACIÓN PAC 10 */}
                       <td className="border border-slate-400 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -756,6 +793,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
 
+                      {/* 5. DOSIFICACIÓN SODA */}
                       <td className="border border-slate-400 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -781,6 +819,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
                       
+                      {/* 6. AGUA CAF */}
                       <td className="border border-slate-400 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -806,6 +845,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
                       
+                      {/* 7. CLORO */}
                       <td className="border border-slate-400 border-r-2 border-r-slate-700 p-0">
                         <input 
                           disabled={!esDelTurnoActual}
@@ -819,6 +859,7 @@ export default function PlanillaUnificada24H() {
                         />
                       </td>
 
+                      {/* 8. BOMBAS EBAP */}
                       {['ebap_b1', 'ebap_b2', 'ebap_b3', 'ebap_b4'].map((bKey) => {
                         const val = bombasHs[bKey] || '';
                         return (
@@ -859,10 +900,10 @@ export default function PlanillaUnificada24H() {
             </table>
           </div>
 
-          {/* LAVADO DE FILTROS, PURGAS Y OBSERVACIONES (DISTRIBUCIÓN GRID 100% ANCHO) */}
+          {/* LAVADO DE FILTROS, PURGAS Y OBSERVACIONES */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 border-t border-slate-300 pt-2 items-stretch w-full">
             
-            {/* TABLA LAVADO DE FILTROS (MÓDULO A Y MÓDULO B) */}
+            {/* TABLA LAVADO DE FILTROS */}
             <div className="lg:col-span-5 overflow-x-auto w-full flex flex-col">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full table-fixed">
                 <thead>
@@ -893,8 +934,8 @@ export default function PlanillaUnificada24H() {
                   </tr>
                 </thead>
                 <tbody>
-                  {HORARIOS.map((hs) => {
-                    const esDelTurnoActual = horasTurnoActual.includes(hs);
+                  {HORARIOS_IMPARES.map((hs) => {
+                    const esDelTurnoActual = horasTurnoImpares.includes(hs);
                     const hsFiltros = filtrosEstado[hs] || {};
 
                     return (
@@ -945,7 +986,7 @@ export default function PlanillaUnificada24H() {
               </table>
             </div>
 
-            {/* TABLA PURGAS DE SEDIMENTADORES (MÓDULO A Y MÓDULO B) */}
+            {/* TABLA PURGAS DE SEDIMENTADORES */}
             <div className="lg:col-span-3 overflow-x-auto w-full flex flex-col">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full">
                 <thead>
@@ -971,8 +1012,8 @@ export default function PlanillaUnificada24H() {
                   </tr>
                 </thead>
                 <tbody>
-                  {HORARIOS.map((hs) => {
-                    const esDelTurnoActual = horasTurnoActual.includes(hs);
+                  {HORARIOS_PARES.map((hs) => {
+                    const esDelTurnoActual = horasTurnoPares.includes(hs);
                     const hsPurgas = purgasEstado[hs] || {};
 
                     return (
