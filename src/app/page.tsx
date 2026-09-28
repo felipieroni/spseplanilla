@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useOperador } from '@/context/operador-context';
 
-const HORARIOS_IMPARES = ['09', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23'];
+const HORARIOS_IMPARES = ['08', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23'];
 const HORARIOS_PARES   = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
 
 const MAPA_TURNOS_IMPARES: Record<string, string[]> = {
