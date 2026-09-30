@@ -678,12 +678,12 @@ export default function PlanillaUnificada24H() {
                     <tr 
                       key={hs} 
                       className={`transition-colors ${
-                        esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'
+                        esDelTurnoActual ? 'bg-blue-100/90 font-semibold' : 'bg-slate-50/50 opacity-60'
                       }`}
                     >
                       {/* HORARIO (PARES) */}
                       <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold ${
-                        esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
+                        esDelTurnoActual ? 'bg-blue-300 text-blue-950' : 'bg-slate-200 text-slate-500'
                       }`}>
                         {hs}
                       </td>
@@ -915,17 +915,17 @@ export default function PlanillaUnificada24H() {
             <div className="lg:col-span-5 overflow-x-auto w-full flex flex-col">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full table-fixed">
                 <thead>
-                  <tr className="bg-cyan-950 text-white font-black tracking-wider border-b border-slate-400">
+                  <tr className="bg-blue-950 text-white font-black tracking-wider border-b border-slate-400">
                     <th className="border border-slate-400 p-1 text-xs uppercase" colSpan={9}>
                       ESTADO / LAVADO DE FILTROS
                     </th>
                   </tr>
-                  <tr className="bg-cyan-900 text-white font-bold border-b border-slate-400 text-xs">
+                  <tr className="bg-blue-900 text-white font-bold border-b border-slate-400 text-xs">
                     <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 w-8" rowSpan={2}>HS</th>
-                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO A</th>
-                    <th className="border border-slate-400 p-0.5 bg-cyan-950/80" colSpan={4}>MÓDULO B</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-blue-950/80" colSpan={4}>MÓDULO A</th>
+                    <th className="border border-slate-400 p-0.5 bg-blue-950/80" colSpan={4}>MÓDULO B</th>
                   </tr>
-                  <tr className="bg-cyan-800 text-white font-bold border-b border-slate-400 text-xs">
+                  <tr className="bg-blue-800 text-white font-bold border-b border-slate-400 text-xs">
                     {ALL_FILTROS.map((f) => {
                       const esRecomendado = filtrosRecomendados.some((rec) => rec.key === f.key);
                       return (
@@ -947,9 +947,9 @@ export default function PlanillaUnificada24H() {
                     const hsFiltros = filtrosEstado[hs] || {};
 
                     return (
-                      <tr key={`lavado-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
+                      <tr key={`lavado-${hs}`} className={esDelTurnoActual ? 'bg-blue-100/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
                         <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold h-6 ${
-                          esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
+                          esDelTurnoActual ? 'bg-blue-300 text-blue-950' : 'bg-slate-200 text-slate-500'
                         }`}>
                           {hs}
                         </td>
@@ -998,17 +998,17 @@ export default function PlanillaUnificada24H() {
             <div className="lg:col-span-3 overflow-x-auto w-full flex flex-col">
               <table className="border-collapse border border-slate-400 text-center text-xs w-full h-full">
                 <thead>
-                  <tr className="bg-amber-950 text-white font-black tracking-wider border-b border-slate-400">
+                  <tr className="bg-green-950 text-white font-black tracking-wider border-b border-slate-400">
                     <th className="border border-slate-400 p-1 text-xs uppercase" colSpan={5}>
                       PURGAS DE SEDIMENTADORES
                     </th>
                   </tr>
-                  <tr className="bg-amber-900 text-white font-bold border-b border-slate-400 text-xs">
+                  <tr className="bg-green-900 text-white font-bold border-b border-slate-400 text-xs">
                     <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5" rowSpan={2}>HS</th>
-                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO A</th>
-                    <th className="border border-slate-400 p-0.5 bg-amber-950/80" colSpan={2}>MÓDULO B</th>
+                    <th className="border border-slate-400 border-r-2 border-r-slate-700 p-0.5 bg-green-950/80" colSpan={2}>MÓDULO A</th>
+                    <th className="border border-slate-400 p-0.5 bg-green-950/80" colSpan={2}>MÓDULO B</th>
                   </tr>
-                  <tr className="bg-amber-800 text-white font-bold border-b border-slate-400 text-xs">
+                  <tr className="bg-green-800 text-white font-bold border-b border-slate-400 text-xs">
                     {ALL_PURGAS.map((s) => (
                       <th 
                         key={s.key} 
@@ -1025,9 +1025,9 @@ export default function PlanillaUnificada24H() {
                     const hsPurgas = purgasEstado[hs] || {};
 
                     return (
-                      <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-amber-50/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
+                      <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-blue-100/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
                         <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold h-6 ${
-                          esDelTurnoActual ? 'bg-amber-200 text-blue-950' : 'bg-slate-200 text-slate-500'
+                          esDelTurnoActual ? 'bg-blue-300 text-blue-950' : 'bg-slate-200 text-slate-500'
                         }`}>
                           {hs}
                         </td>

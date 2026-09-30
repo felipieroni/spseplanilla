@@ -374,7 +374,7 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
             {/* SECCIÓN PURGAS (MÓDULOS A Y B - ITERACIÓN EN HORARIOS PARES) */}
             <div className="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-green-600"></span>
                 Purgas de Sedimentadores (Módulos A y B)
               </h4>
               <div className="overflow-x-auto border bg-white rounded-md">
