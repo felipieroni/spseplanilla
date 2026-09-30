@@ -11,6 +11,7 @@ export interface RegistroHistorial {
   turno: string;
   operador: string;
   observaciones: string;
+  ultimaModificacion?: string;
   parametros?: Record<string, Record<string, string>>;
   filtrosEstado?: Record<string, Record<string, string>>;
   purgasEstado?: Record<string, Record<string, string>>;
@@ -97,11 +98,12 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
     });
 
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(datosFilas, { origin: "A5" } as any);
+    const worksheet = XLSX.utils.json_to_sheet(datosFilas, { origin: "A6" } as any);
     
     XLSX.utils.sheet_add_aoa(worksheet, [
       ["PLANILLA DE CONTROL DE PLANTA POTABILIZADORA - HISTORIAL DIARIO"],
-      [`Fecha: ${registro.fecha}`, `Operadores: ${registro.operador}`],
+      [`Fecha Planilla: ${registro.fecha}`, `Operadores: ${registro.operador}`],
+      [`Última Modificación: ${registro.ultimaModificacion || 'Sin registro'}`],
       [`Observaciones: ${registro.observaciones}`],
       []
     ], { origin: "A1" });
@@ -123,7 +125,7 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="font-semibold text-slate-600">Filtrar Fecha:</label>
+          <label className="font-semibold text-slate-600">Buscar Fecha:</label>
           <Input
             type="date"
             value={filtroFecha}
@@ -147,7 +149,9 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-200 text-slate-800 font-bold border-b">
               <tr>
-                <th className="p-3 border-r">Fecha</th>
+                <th className="p-3 border-r">
+                  Fecha <span className="font-normal italic">(año/mes/dia)</span>
+                </th>
                 <th className="p-3 border-r">Operadores del Día</th>
                 <th className="p-3 border-r">Observaciones</th>
                 <th className="p-3 text-center">Acciones</th>
@@ -196,17 +200,23 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
         </div>
       ) : (
         <div className="bg-white border rounded-xl shadow-sm p-4 flex flex-col gap-5">
-          <div className="flex justify-between items-center border-b pb-3">
+          {/* ENCABEZADO DEL DETALLE */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-3">
             <div>
               <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">Planilla de Control Diaria</span>
               <h3 className="text-lg font-extrabold text-slate-900">
-                Fecha: {registroSeleccionado.fecha}
+                Fecha Planilla: {registroSeleccionado.fecha}
               </h3>
-              <p className="text-xs text-slate-600">
-                Operadores del Día: <strong className="text-slate-800">{registroSeleccionado.operador}</strong>
-              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1">
+                <p>
+                  Operadores del Día: <strong className="text-slate-800">{registroSeleccionado.operador}</strong>
+                </p>
+                <p className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-medium">
+                  Ultima modificación: <strong className="font-bold text-blue-900">{registroSeleccionado.ultimaModificacion || 'Sin registro'}</strong>
+                </p>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <Button
                 onClick={() => exportarPlanillaAExcel(registroSeleccionado)}
                 className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold"

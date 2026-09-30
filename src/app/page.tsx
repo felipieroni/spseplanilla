@@ -80,6 +80,7 @@ interface RegistroHistorial {
   operador: string;
   observaciones: string;
   descargado?: boolean;
+  ultimaModificacion?: string; // 👈 Agregar este campo opcional
   parametros?: Record<string, Record<string, string>>;
   filtrosEstado?: Record<string, Record<string, string>>;
   purgasEstado?: Record<string, Record<string, string>>;
@@ -270,10 +271,14 @@ export default function PlanillaUnificada24H() {
     }
   };
 
-  // GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL (FUSIONA POR DÍA ÚNICO)
+// GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL (FUSIONA POR DÍA ÚNICO)
   const guardarPlanillaYRegistrar = () => {
     const fechaGuardar = fecha || new Date().toISOString().split('T')[0];
     const indexExistente = historial.findIndex((r) => r.fecha === fechaGuardar);
+
+    // Obtener fecha y hora actual formateada
+    const ahora = new Date();
+    const fechaHoraModificacion = `${ahora.toLocaleDateString('es-AR')} a las ${ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs`;
 
     let nuevoHistorial: RegistroHistorial[];
 
@@ -293,6 +298,7 @@ export default function PlanillaUnificada24H() {
         operador: operadorFinal,
         observaciones: observacionesGenerales || regPrevio.observaciones,
         descargado: false,
+        ultimaModificacion: fechaHoraModificacion, // 👈 Registra la última actualización
         parametros: { ...(regPrevio.parametros || {}), ...parametros },
         filtrosEstado: { ...(regPrevio.filtrosEstado || {}), ...filtrosEstado },
         purgasEstado: { ...(regPrevio.purgasEstado || {}), ...purgasEstado },
@@ -309,6 +315,7 @@ export default function PlanillaUnificada24H() {
         operador: operadorActual || 'SIN REGISTRAR',
         observaciones: observacionesGenerales || 'Sin observaciones registradas.',
         descargado: false,
+        ultimaModificacion: fechaHoraModificacion, // 👈 Registra el primer guardado
         parametros: JSON.parse(JSON.stringify(parametros)),
         filtrosEstado: JSON.parse(JSON.stringify(filtrosEstado)),
         purgasEstado: JSON.parse(JSON.stringify(purgasEstado)),
@@ -324,6 +331,7 @@ export default function PlanillaUnificada24H() {
     alert(`¡Planilla diaria del ${fechaGuardar} guardada/actualizada con éxito!`);
   };
 
+  
   const eliminarRegistroHistorial = (id: string) => {
     const registro = historial.find((r) => r.id === id);
     if (!registro) return;
