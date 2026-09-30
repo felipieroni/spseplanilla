@@ -960,7 +960,7 @@ export default function PlanillaUnificada24H() {
                             <td 
                               key={f.key} 
                               className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
-                                val === 'L' ? 'bg-red-400 text-black font-black' : val === 'M' ? 'bg-emerald-100 font-bold text-emerald-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
+                                val === 'L' ? 'bg-red-300 text-black font-black' : val === 'M' ? 'bg-emerald-200 font-bold text-emerald-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                               }`}
                             >
                               <DropdownMenu>
@@ -970,10 +970,10 @@ export default function PlanillaUnificada24H() {
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="center" className="min-w-[5rem] p-1">
-                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'L')} className="text-xs font-black bg-cyan-100 py-1.5 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'L')} className="text-xs font-black bg-red-300 py-1.5 cursor-pointer">
                                     L (Lavado)
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'M')} className="text-xs font-bold py-1.5 cursor-pointer">
+                                  <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, 'M')} className="text-xs font-bold bg-green-200 py-1.5 cursor-pointer">
                                     M (Marcha)
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setEstadoFiltro(hs, f.key, '/')} className="text-xs font-bold bg-slate-200 py-1.5 cursor-pointer">
@@ -1038,7 +1038,7 @@ export default function PlanillaUnificada24H() {
                             <td 
                               key={s.key} 
                               className={`border border-slate-400 p-0 h-6 ${esUltimoModuloA ? 'border-r-2 border-r-slate-700' : ''} ${
-                                val === 'P' ? 'bg-amber-300 font-extrabold text-amber-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
+                                val === 'P' ? 'bg-yellow-200/70 font-extrabold text-amber-950' : val === '/' ? 'bg-slate-300 text-slate-800 font-bold' : ''
                               }`}
                             >
                               <DropdownMenu>
