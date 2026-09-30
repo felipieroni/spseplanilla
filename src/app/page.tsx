@@ -1025,9 +1025,9 @@ export default function PlanillaUnificada24H() {
                     const hsPurgas = purgasEstado[hs] || {};
 
                     return (
-                      <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-blue-100/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
+                      <tr key={`purga-${hs}`} className={esDelTurnoActual ? 'bg-green-100/90 font-semibold' : 'bg-slate-50/50 opacity-60'}>
                         <td className={`border border-slate-400 border-r-2 border-r-slate-700 p-0 font-bold h-6 ${
-                          esDelTurnoActual ? 'bg-blue-300 text-blue-950' : 'bg-slate-200 text-slate-500'
+                          esDelTurnoActual ? 'bg-green-300/80 text-blue-950' : 'bg-slate-200 text-slate-500'
                         }`}>
                           {hs}
                         </td>
