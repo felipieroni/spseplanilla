@@ -203,7 +203,7 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
           {/* ENCABEZADO DEL DETALLE */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-3">
             <div>
-              <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">Planilla de Control Diaria</span>
+              <span className="text-xs text-blue-600 font-bold uppercase tracking-wider"></span>
               <h3 className="text-lg font-extrabold text-slate-900">
                 Fecha Planilla: {registroSeleccionado.fecha}
               </h3>
