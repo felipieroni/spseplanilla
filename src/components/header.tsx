@@ -18,6 +18,7 @@ import { useOperador } from '@/context/operador-context';
 const navItems = [
   { href: '/', label: 'Cargar Datos' },
   { href: '/historial', label: 'Historial' },
+  { href: '/stock', label: 'Stock' },
   { href: '/guia-dosificacion', label: 'Guía Dosificación' },
   { href: '/guia-parshall', label: 'Guía Parshall' },
 ];
