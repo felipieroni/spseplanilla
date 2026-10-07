@@ -187,7 +187,7 @@ export default function DatosBorradosPage() {
         <div className="w-full max-w-7xl mx-auto bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-lg shadow-sm flex items-center gap-3 text-amber-900">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-xs leading-relaxed">
-            <strong>Modo Solo Lectura:</strong> Se encuentra registrado como operador estándar. Únicamente el <strong>Gestor General</strong> (clave: 1234) posee permisos para restaurar datos borrados de la papelera.
+            <strong>Modo Solo Lectura:</strong> Se encuentra registrado como operador estándar. Únicamente el <strong>Gestor General</strong> posee permisos para restaurar datos borrados de la papelera.
           </p>
         </div>
       )}

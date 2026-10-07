@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Search, X, Edit2, Check, Calendar, Sparkles, Repeat, History, Info } from 'lucide-react';
+import { useOperador } from '@/context/operador-context';
 
 interface Tanque {
   id: string;
@@ -144,6 +145,7 @@ const initialTanquesData: Tanque[] = [
 ];
 
 export default function SeguimientoTanquesPage() {
+  const { esGestorGeneral } = useOperador();
   const [tanques, setTanques] = useState<Tanque[]>(initialTanquesData);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -229,8 +231,13 @@ export default function SeguimientoTanquesPage() {
     setEditingId(nuevoId); // Activa la edición en la nueva fila automáticamente
   };
 
-  // BORRADO SUAVE (SOFT DELETE): MUEVE A DATOS BORRADOS Y PERMITE RESTAURAR
+  // BORRADO SUAVE (RESTRINGIDO A GESTOR GENERAL)
   const handleEliminar = (id: string) => {
+    if (!esGestorGeneral) {
+      alert('Solo el Gestor General tiene permisos para mover registros a Datos Borrados.');
+      return;
+    }
+
     const confirmar = window.confirm('¿Deseas mover este tanque a Datos Borrados?');
     if (!confirmar) return;
 
@@ -486,14 +493,18 @@ export default function SeguimientoTanquesPage() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => handleEliminar(row.id)}
-                    className="text-slate-300 hover:text-red-600 transition-colors p-1"
-                    title="Mover a Datos Borrados"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+
+                  {/* EL BOTÓN BORRAR SOLO SE MUESTRA SI ES GESTOR GENERAL */}
+                  {esGestorGeneral && (
+                    <button
+                      type="button"
+                      onClick={() => handleEliminar(row.id)}
+                      className="text-slate-300 hover:text-red-600 transition-colors p-1"
+                      title="Mover a Datos Borrados"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
