@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useOperador } from '@/context/operador-context';
 
 interface RegistroHistorialPlanilla {
   id: string;
@@ -21,6 +22,7 @@ interface TanqueGasCloro {
   fechaES: string;
   estado: 'EN_USO' | 'EN_ESPERA';
   posicion: 'BALANZA_1' | 'BALANZA_2' | 'EN_DEPOSITO' | 'FUERA_PLANTA';
+  eliminado?: boolean;
 }
 
 interface RegistroStockDiario {
@@ -37,12 +39,12 @@ interface RegistroStockDiario {
   ultimaModificacion?: string;
 }
 
-// CONVERTIDOR ROBUSTO DE NÚMEROS
-const parseVal = (val: string | undefined | number): number => {
+// CONVERTIDOR ROBUSTO Y SEGURO DE NÚMEROS
+const parseVal = (val: any): number => {
   if (val === undefined || val === null || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
 
-  let s = val.toString().trim();
+  let s = String(val).trim();
   
   if (s.includes('.') && s.includes(',')) {
     s = s.replace(/\./g, '').replace(',', '.');
@@ -54,10 +56,11 @@ const parseVal = (val: string | undefined | number): number => {
   return isNaN(num) ? 0 : num;
 };
 
-// HOMOLOGADOR UNIVERSAL DE FECHAS (YYYY-MM-DD)
-const normalizarFecha = (f: string | undefined): string => {
+// HOMOLOGADOR UNIVERSAL Y SEGURO DE FECHAS (YYYY-MM-DD)
+const normalizarFecha = (f: any): string => {
   if (!f) return '';
-  const clean = f.trim().split('T')[0];
+  const str = String(f).trim();
+  const clean = str.split('T')[0];
   if (clean.includes('/')) {
     const partes = clean.split('/');
     if (partes.length === 3) {
@@ -84,6 +87,7 @@ const normalizarFecha = (f: string | undefined): string => {
 };
 
 export default function StockPage() {
+  const { esGestorGeneral } = useOperador();
   const [isMounted, setIsMounted] = useState(false);
 
   // FECHA Y REGISTRO DIARIO
@@ -105,13 +109,30 @@ export default function StockPage() {
   const [historialPlanillas, setHistorialPlanillas] = useState<RegistroHistorialPlanilla[]>([]);
   const [historialStockMap, setHistorialStockMap] = useState<Record<string, RegistroStockDiario>>({});
 
+  const createTanqueInicial = (): TanqueGasCloro[] => [
+    {
+      id: '1',
+      tanqueNo: '10',
+      pesoTotal: '130',
+      pesoTara: '60',
+      fechaIngreso: '',
+      fechaES: '',
+      estado: 'EN_USO',
+      posicion: 'BALANZA_1',
+      eliminado: false,
+    },
+  ];
+
   // REFRESCAR HISTORIAL DESDE LOCALSTORAGE
   const actualizarHistorialPlanillas = () => {
     const datosPlanillas = localStorage.getItem('historial_planillas');
     if (datosPlanillas) {
       try {
-        setHistorialPlanillas(JSON.parse(datosPlanillas));
-      } catch (e) {}
+        const parsed = JSON.parse(datosPlanillas);
+        if (Array.isArray(parsed)) setHistorialPlanillas(parsed);
+      } catch (e) {
+        console.error("Error al parsear historial_planillas:", e);
+      }
     }
   };
 
@@ -121,34 +142,39 @@ export default function StockPage() {
     const mapPacLts: Record<string, number> = {};
     const mapSodaKg: Record<string, number> = {};
 
-    historialPlanillas.forEach((plan) => {
-      if (!plan.fecha || !plan.parametros) return;
+    if (Array.isArray(historialPlanillas)) {
+      historialPlanillas.forEach((plan) => {
+        if (!plan || !plan.fecha || !plan.parametros) return;
 
-      const fechaNorm = normalizarFecha(plan.fecha);
-      let cloroKg = 0;
-      let pacLts = 0;
-      let sodaKg = 0;
+        const fechaNorm = normalizarFecha(plan.fecha);
+        let cloroKg = 0;
+        let pacLts = 0;
+        let sodaKg = 0;
 
-      Object.values(plan.parametros).forEach((p) => {
-        const cPpm = parseVal(p.cloro || p.cloroPpm || p.cloroPPM);
-        const caudal = parseVal(p.caudal || p.caudalM3 || p.caudal_m3);
-        const pMl = parseVal(p.pacMlMin || p.pac || p.pacMl);
-        const sMl = parseVal(p.sodaMlMin || p.soda || p.sodaMl);
+        if (typeof plan.parametros === 'object' && plan.parametros !== null) {
+          Object.values(plan.parametros).forEach((p) => {
+            if (!p) return;
+            const cPpm = parseVal(p.cloro || p.cloroPpm || p.cloroPPM);
+            const caudal = parseVal(p.caudal || p.caudalM3 || p.caudal_m3);
+            const pMl = parseVal(p.pacMlMin || p.pac || p.pacMl);
+            const sMl = parseVal(p.sodaMlMin || p.soda || p.sodaMl);
 
-        if (cPpm > 0 && caudal > 0) {
-          cloroKg += (cPpm * caudal * 2) / 1000;
-        } else if (p.cloroKg) {
-          cloroKg += parseVal(p.cloroKg);
+            if (cPpm > 0 && caudal > 0) {
+              cloroKg += (cPpm * caudal * 2) / 1000;
+            } else if (p.cloroKg) {
+              cloroKg += parseVal(p.cloroKg);
+            }
+
+            if (pMl > 0) pacLts += (pMl * 120) / 1000;
+            if (sMl > 0) sodaKg += (sMl * 120) / 1000;
+          });
         }
 
-        if (pMl > 0) pacLts += (pMl * 120) / 1000;
-        if (sMl > 0) sodaKg += (sMl * 120) / 1000;
+        mapCloroKg[fechaNorm] = (mapCloroKg[fechaNorm] || 0) + Math.round(cloroKg * 10) / 10;
+        mapPacLts[fechaNorm] = (mapPacLts[fechaNorm] || 0) + Math.round(pacLts * 10) / 10;
+        mapSodaKg[fechaNorm] = (mapSodaKg[fechaNorm] || 0) + Math.round(sodaKg * 10) / 10;
       });
-
-      mapCloroKg[fechaNorm] = (mapCloroKg[fechaNorm] || 0) + Math.round(cloroKg * 10) / 10;
-      mapPacLts[fechaNorm] = (mapPacLts[fechaNorm] || 0) + Math.round(pacLts * 10) / 10;
-      mapSodaKg[fechaNorm] = (mapSodaKg[fechaNorm] || 0) + Math.round(sodaKg * 10) / 10;
-    });
+    }
 
     return { mapCloroKg, mapPacLts, mapSodaKg };
   }, [historialPlanillas]);
@@ -179,13 +205,13 @@ export default function StockPage() {
     return nuevoMap;
   };
 
-  // CARGAR DATOS DE UNA FECHA ESPECÍFICA
+  // CARGAR DATOS DE UNA FECHA ESPECÍFICA CON CONSERVACIÓN COMPLETA DE TANQUES
   const cargarDatosStockFecha = (fechaSel: string, mapStockActual: Record<string, RegistroStockDiario>) => {
     actualizarHistorialPlanillas();
     const fechaNormSel = normalizarFecha(fechaSel);
     const reg = mapStockActual[fechaNormSel];
 
-    if (reg && reg.tanques && reg.tanques.length > 0) {
+    if (reg && reg.tanques && Array.isArray(reg.tanques) && reg.tanques.length > 0) {
       setTanques(reg.tanques);
       setPacPrincipio(reg.pacPrincipio || '');
       setPacEntrada(reg.pacEntrada || '');
@@ -196,7 +222,7 @@ export default function StockPage() {
       setSodaSalida(reg.sodaSalida || '');
       setSodaDestino(reg.sodaDestino || '');
     } else {
-      const fechasPrevias = Object.keys(mapStockActual)
+      const fechasPrevias = Object.keys(mapStockActual || {})
         .map((f) => normalizarFecha(f))
         .filter((f) => f < fechaNormSel)
         .sort();
@@ -206,7 +232,7 @@ export default function StockPage() {
         const regAnt = mapStockActual[ultimaFechaPrev];
         const consumoCloroAnt = consumosDiariosPlanillasMap.mapCloroKg[ultimaFechaPrev] || 0;
 
-        if (regAnt && regAnt.tanques && regAnt.tanques.length > 0) {
+        if (regAnt && regAnt.tanques && Array.isArray(regAnt.tanques) && regAnt.tanques.length > 0) {
           const tanquesEncadenados = regAnt.tanques.map((tAnt) => {
             const pTot = parseVal(tAnt.pesoTotal);
             const pTara = parseVal(tAnt.pesoTara);
@@ -242,7 +268,12 @@ export default function StockPage() {
         const datosMaster = localStorage.getItem('stock_tanques_master_v8');
         if (datosMaster) {
           try {
-            setTanques(JSON.parse(datosMaster));
+            const parsed = JSON.parse(datosMaster);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setTanques(parsed);
+            } else {
+              setTanques(createTanqueInicial());
+            }
           } catch (e) {
             setTanques(createTanqueInicial());
           }
@@ -276,7 +307,7 @@ export default function StockPage() {
     let mapStock: Record<string, RegistroStockDiario> = {};
     if (datosStock) {
       try {
-        mapStock = JSON.parse(datosStock);
+        mapStock = JSON.parse(datosStock) || {};
         setHistorialStockMap(mapStock);
       } catch (e) {}
     }
@@ -292,19 +323,6 @@ export default function StockPage() {
       window.removeEventListener('storage', autoRefresh);
     };
   }, []);
-
-  const createTanqueInicial = (): TanqueGasCloro[] => [
-    {
-      id: '1',
-      tanqueNo: '10',
-      pesoTotal: '130',
-      pesoTara: '60',
-      fechaIngreso: '',
-      fechaES: '',
-      estado: 'EN_USO',
-      posicion: 'BALANZA_1',
-    },
-  ];
 
   const handleFechaChange = (nuevaFecha: string) => {
     const mapaActualizado = guardarEstadoActualPrevio(fecha);
@@ -325,16 +343,25 @@ export default function StockPage() {
     alert(`¡Planilla de stock para el día ${fechaNorm} guardada correctamente!`);
   };
 
-  // CAMBIOS EN TANQUES CON OPCIÓN "EN USO" ÚNICA
-  const handleTanqueChange = (index: number, campo: keyof TanqueGasCloro, valor: any) => {
+  // CAMBIOS EN TANQUES MEDIANTE ID
+  const handleTanqueChange = (id: string, campo: keyof TanqueGasCloro, valor: any) => {
     let nuevosTanques = [...tanques];
+    const index = nuevosTanques.findIndex((t) => t.id === id);
+    if (index === -1) return;
 
     if (campo === 'estado' && valor === 'EN_USO') {
-      nuevosTanques = nuevosTanques.map((t, i) => {
-        if (i === index) {
+      const b1Libre = !nuevosTanques.some((t) => t.id !== id && !t.eliminado && t.posicion === 'BALANZA_1');
+      const b2Libre = !nuevosTanques.some((t) => t.id !== id && !t.eliminado && t.posicion === 'BALANZA_2');
+
+      nuevosTanques = nuevosTanques.map((t) => {
+        if (t.id === id) {
           let pos = t.posicion;
           if (pos !== 'BALANZA_1' && pos !== 'BALANZA_2') {
-            pos = 'BALANZA_1';
+            pos = b1Libre ? 'BALANZA_1' : b2Libre ? 'BALANZA_2' : 'BALANZA_1';
+          } else if (pos === 'BALANZA_1' && !b1Libre) {
+            pos = b2Libre ? 'BALANZA_2' : 'BALANZA_1';
+          } else if (pos === 'BALANZA_2' && !b2Libre) {
+            pos = b1Libre ? 'BALANZA_1' : 'BALANZA_2';
           }
           return { ...t, estado: 'EN_USO' as const, posicion: pos };
         } else {
@@ -369,25 +396,42 @@ export default function StockPage() {
         fechaES: '',
         estado: 'EN_ESPERA' as const,
         posicion: 'EN_DEPOSITO' as const,
+        eliminado: false,
       },
     ];
     setTanques(nuevos);
     localStorage.setItem('stock_tanques_master_v8', JSON.stringify(nuevos));
   };
 
+  // OCULTAR TANQUE Y MOVER A DATOS BORRADOS (SOFT DELETE - SOLO GESTOR GENERAL)
   const eliminarTanque = (id: string) => {
-    if (tanques.length <= 1) return;
-    const nuevos = tanques.filter((t) => t.id !== id);
+    if (!esGestorGeneral) return;
+
+    const tanquesActivos = tanques.filter((t) => !t.eliminado);
+    if (tanquesActivos.length <= 1) {
+      alert('Debe permanecer al menos un tanque activo en el stock.');
+      return;
+    }
+
+    const confirmar = window.confirm('¿Deseas mover este tanque a Datos Borrados?');
+    if (!confirmar) return;
+
+    const nuevos = tanques.map((t) =>
+      t.id === id ? { ...t, eliminado: true } : t
+    );
+
     setTanques(nuevos);
     localStorage.setItem('stock_tanques_master_v8', JSON.stringify(nuevos));
   };
+
+  if (!isMounted) return null;
 
   const fechaNormSel = normalizarFecha(fecha);
   const consumoPacHoy = consumosDiariosPlanillasMap.mapPacLts[fechaNormSel] || 0;
   const consumoSodaHoy = consumosDiariosPlanillasMap.mapSodaKg[fechaNormSel] || 0;
   const consumoCloroHoy = consumosDiariosPlanillasMap.mapCloroKg[fechaNormSel] || 0;
 
-  if (!isMounted) return null;
+  const tanquesActivos = Array.isArray(tanques) ? tanques.filter((t) => !t.eliminado) : [];
 
   return (
     <div className="w-full min-h-screen bg-slate-100 p-4 md:p-6 space-y-6 text-xs text-slate-800 pb-12">
@@ -497,7 +541,7 @@ export default function StockPage() {
                 <TableCell className="p-1 border-r border-slate-300">
                   <Input
                     type="text"
-                    placeholder="Ej. Planta Potabilizadora"
+                    placeholder="-"
                     value={pacDestino}
                     onChange={(e) => setPacDestino(e.target.value)}
                     className="h-7 text-center text-xs border-none shadow-none"
@@ -546,7 +590,7 @@ export default function StockPage() {
                 <TableCell className="p-1 border-r border-slate-300">
                   <Input
                     type="text"
-                    placeholder="Ej. Planta Potabilizadora"
+                    placeholder="-"
                     value={sodaDestino}
                     onChange={(e) => setSodaDestino(e.target.value)}
                     className="h-7 text-center text-xs border-none shadow-none"
@@ -623,7 +667,7 @@ export default function StockPage() {
             </TableHeader>
 
             <TableBody>
-              {tanques.map((tanque, index) => {
+              {tanquesActivos.map((tanque) => {
                 const pTotal = parseVal(tanque.pesoTotal);
                 const pTara = parseVal(tanque.pesoTara);
                 const netoInicial = Math.max(0, pTotal - pTara);
@@ -632,11 +676,17 @@ export default function StockPage() {
                 const consumoDia = esEnUso ? consumoCloroHoy : 0;
                 const netoRestante = Math.max(0, netoInicial - consumoDia);
 
+                // VERIFICAR DISPONIBILIDAD DE BALANZAS
+                const b1Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_1');
+                const b2Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_2');
+
                 return (
                   <TableRow
                     key={tanque.id}
                     className={`border-b border-slate-300 transition-colors ${
-                      esEnUso ? 'bg-emerald-100/90 font-semibold text-emerald-950' : 'hover:bg-slate-50'
+                      esEnUso
+                        ? 'bg-emerald-100 hover:bg-emerald-100 font-semibold text-emerald-950'
+                        : 'hover:bg-slate-50'
                     }`}
                   >
                     
@@ -646,7 +696,7 @@ export default function StockPage() {
                         type="text"
                         placeholder="N°"
                         value={tanque.tanqueNo}
-                        onChange={(e) => handleTanqueChange(index, 'tanqueNo', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'tanqueNo', e.target.value)}
                         className="h-7 text-center text-xs border-none shadow-none font-bold text-slate-900 bg-transparent"
                       />
                     </TableCell>
@@ -657,7 +707,7 @@ export default function StockPage() {
                         type="text"
                         placeholder="0"
                         value={tanque.pesoTotal}
-                        onChange={(e) => handleTanqueChange(index, 'pesoTotal', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'pesoTotal', e.target.value)}
                         className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
                       />
                     </TableCell>
@@ -668,13 +718,13 @@ export default function StockPage() {
                         type="text"
                         placeholder="0"
                         value={tanque.pesoTara}
-                        onChange={(e) => handleTanqueChange(index, 'pesoTara', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'pesoTara', e.target.value)}
                         className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
                       />
                     </TableCell>
 
                     {/* 4. CONSUMO DEL DÍA */}
-                    <TableCell className={`p-1 border-r border-slate-300 font-mono font-bold ${esEnUso ? 'text-amber-900' : 'text-amber-950 bg-amber-50/60'}`}>
+                    <TableCell className={`p-1 border-r border-slate-300 font-mono font-bold ${esEnUso ? 'text-amber-900 bg-transparent' : 'text-amber-950 bg-amber-50/60'}`}>
                       {consumoDia > 0 ? `${consumoDia.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg` : '-'}
                     </TableCell>
 
@@ -688,7 +738,7 @@ export default function StockPage() {
                       <Input
                         type="date"
                         value={tanque.fechaIngreso}
-                        onChange={(e) => handleTanqueChange(index, 'fechaIngreso', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'fechaIngreso', e.target.value)}
                         className="h-7 text-center text-xs border-none shadow-none bg-transparent"
                       />
                     </TableCell>
@@ -698,26 +748,30 @@ export default function StockPage() {
                       <Input
                         type="date"
                         value={tanque.fechaES}
-                        onChange={(e) => handleTanqueChange(index, 'fechaES', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'fechaES', e.target.value)}
                         className="h-7 text-center text-xs border-none shadow-none bg-transparent"
                       />
                     </TableCell>
 
-                    {/* 8. POSICIÓN */}
+                    {/* 8. POSICIÓN (BALANZAS ÚNICAS) */}
                     <TableCell className="p-1 border-r border-slate-300">
                       <select
                         value={tanque.posicion}
-                        onChange={(e) => handleTanqueChange(index, 'posicion', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'posicion', e.target.value)}
                         className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
                           esEnUso ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       >
-                        <option value="BALANZA_1">Balanza 1</option>
-                        <option value="BALANZA_2">Balanza 2</option>
+                        <option value="BALANZA_1" disabled={b1Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
+                          Balanza 1 {b1Ocupada ? '(Ocupada)' : ''}
+                        </option>
+                        <option value="BALANZA_2" disabled={b2Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
+                          Balanza 2 {b2Ocupada ? '(Ocupada)' : ''}
+                        </option>
                         {!esEnUso && (
                           <>
-                            <option value="EN_DEPOSITO">En Depósito</option>
-                            <option value="FUERA_PLANTA">Fuera de planta</option>
+                            <option value="EN_DEPOSITO" className="bg-white text-slate-800">En Depósito</option>
+                            <option value="FUERA_PLANTA" className="bg-white text-slate-800">Fuera de planta</option>
                           </>
                         )}
                       </select>
@@ -727,29 +781,37 @@ export default function StockPage() {
                     <TableCell className="p-1 border-r border-slate-300">
                       <select
                         value={tanque.estado}
-                        onChange={(e) => handleTanqueChange(index, 'estado', e.target.value)}
+                        onChange={(e) => handleTanqueChange(tanque.id, 'estado', e.target.value)}
                         className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
                           esEnUso
                             ? 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-sm'
                             : 'bg-white text-slate-800 border-slate-300'
                         }`}
                       >
-                        <option value="EN_USO">⚡ En uso</option>
-                        <option value="EN_ESPERA">En espera</option>
+                        <option value="EN_USO" className="bg-emerald-600 text-white font-bold">
+                          ⚡ En uso
+                        </option>
+                        <option value="EN_ESPERA" className="bg-white text-slate-800 font-normal">
+                          En espera
+                        </option>
                       </select>
                     </TableCell>
 
                     {/* 10. BORRAR FILA */}
                     <TableCell className="p-1 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => eliminarTanque(tanque.id)}
-                        className="h-7 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
-                        title="Eliminar Tanque"
-                      >
-                        Borrar
-                      </Button>
+                      {esGestorGeneral ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => eliminarTanque(tanque.id)}
+                          className="h-7 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
+                          title="Ocultar Tanque y mover a Datos Borrados"
+                        >
+                          Borrar
+                        </Button>
+                      ) : (
+                        <span className="text-slate-400 font-medium italic text-[11px]">-</span>
+                      )}
                     </TableCell>
 
                   </TableRow>

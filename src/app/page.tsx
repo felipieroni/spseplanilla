@@ -34,7 +34,7 @@ const MAPA_TURNOS_PARES: Record<string, string[]> = {
   '18:00 a 00:00': ['18', '20', '22'],
 };
 
-// ESTRUCTURA EN MÓDULOS A Y B:
+// ESTRUCTURA EN MÓDULOS A Y B
 const FILTROS_MODULO_A = [
   { key: 'MA_F1', label: 'F1' },
   { key: 'MA_F2', label: 'F2' },
@@ -80,7 +80,8 @@ interface RegistroHistorial {
   operador: string;
   observaciones: string;
   descargado?: boolean;
-  ultimaModificacion?: string; // 👈 Agregar este campo opcional
+  eliminado?: boolean;
+  ultimaModificacion?: string;
   parametros?: Record<string, Record<string, string>>;
   filtrosEstado?: Record<string, Record<string, string>>;
   purgasEstado?: Record<string, Record<string, string>>;
@@ -92,8 +93,8 @@ export default function PlanillaUnificada24H() {
   const [fecha, setFecha] = useState('');
   const [horaActualSistema, setHoraActualSistema] = useState('');
 
-  // OPERADOR GLOBAL
-  const { operadorActual } = useOperador();
+  // CONTEXTO DE OPERADOR Y PERMISOS DE GESTOR GENERAL
+  const { operadorActual, esGestorGeneral } = useOperador();
 
   // ESTADO DE TURNO
   const [turnoActivo, setTurnoActivo] = useState('00:00 a 06:00');
@@ -111,9 +112,9 @@ export default function PlanillaUnificada24H() {
   const [filtroFechaHistorial, setFiltroFechaHistorial] = useState('');
   const [historial, setHistorial] = useState<RegistroHistorial[]>([]);
 
-  // CARGAR DATOS DE UNA FECHA ESPECÍFICA
+  // CARGAR DATOS DE UNA FECHA ESPECÍFICA (IGNORA ELIMINADOS)
   const cargarDatosDeFecha = (fechaSeleccionada: string, listaHistorial: RegistroHistorial[]) => {
-    const registro = listaHistorial.find((r) => r.fecha === fechaSeleccionada);
+    const registro = listaHistorial.find((r) => r.fecha === fechaSeleccionada && !r.eliminado);
     if (registro) {
       setParametros(registro.parametros || {});
       setFiltrosEstado(registro.filtrosEstado || {});
@@ -184,9 +185,8 @@ export default function PlanillaUnificada24H() {
   const horasTurnoImpares = MAPA_TURNOS_IMPARES[turnoActivo] || [];
   const horasTurnoPares   = MAPA_TURNOS_PARES[turnoActivo] || [];
 
-  // RECOMENDACIÓN DINÁMICA: EVALÚA FUERA DE SERVICIO SOLO EN EL TURNO ACTIVO
+  // RECOMENDACIÓN DINÁMICA DE LAVADO DE FILTROS
   const obtenerFiltrosRecomendadosPorModulo = (listaFiltros: typeof FILTROS_MODULO_A) => {
-    // Un filtro está "Fuera de Servicio" solo si tiene una '/' asignada en las horas del TURNO ACTIVO
     const filtrosActivos = listaFiltros.filter((f) => {
       const estaFueraDeServicioEnTurnoActivo = horasTurnoImpares.some(
         (hs) => filtrosEstado[hs]?.[f.key] === '/'
@@ -217,30 +217,31 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 2. Revisar el historial guardado de días anteriores
-    historial.forEach((registro, idx) => {
-      if (!registro.filtrosEstado) return;
-      
-      const offsetRegistro = -(idx + 1) * HORARIOS_IMPARES.length;
+    // 2. Revisar el historial guardado de días anteriores (ignora eliminados)
+    historial
+      .filter((r) => !r.eliminado)
+      .forEach((registro, idx) => {
+        if (!registro.filtrosEstado) return;
+        
+        const offsetRegistro = -(idx + 1) * HORARIOS_IMPARES.length;
 
-      Object.entries(registro.filtrosEstado).forEach(([hs, hsData]) => {
-        if (!hsData) return;
-        const hIndex = HORARIOS_IMPARES.indexOf(hs);
-        if (hIndex === -1) return;
+        Object.entries(registro.filtrosEstado).forEach(([hs, hsData]) => {
+          if (!hsData) return;
+          const hIndex = HORARIOS_IMPARES.indexOf(hs);
+          if (hIndex === -1) return;
 
-        const pasoGlobal = offsetRegistro + hIndex;
+          const pasoGlobal = offsetRegistro + hIndex;
 
-        filtrosActivos.forEach((f) => {
-          if (hsData[f.key] === 'L') {
-            if (pasoGlobal > ultimoPasoLavado[f.key]) {
-              ultimoPasoLavado[f.key] = pasoGlobal;
+          filtrosActivos.forEach((f) => {
+            if (hsData[f.key] === 'L') {
+              if (pasoGlobal > ultimoPasoLavado[f.key]) {
+                ultimoPasoLavado[f.key] = pasoGlobal;
+              }
             }
-          }
+          });
         });
       });
-    });
 
-    // 3. Buscar el MÍNIMO paso de lavado entre los filtros actualmente operativos
     let minPaso = Infinity;
     filtrosActivos.forEach((f) => {
       if (ultimoPasoLavado[f.key] < minPaso) {
@@ -248,7 +249,6 @@ export default function PlanillaUnificada24H() {
       }
     });
 
-    // Devuelve todos los filtros empatados con el mayor tiempo transcurrido sin lavar
     return filtrosActivos.filter((f) => ultimoPasoLavado[f.key] === minPaso);
   };
 
@@ -271,12 +271,11 @@ export default function PlanillaUnificada24H() {
     }
   };
 
-// GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL (FUSIONA POR DÍA ÚNICO)
+  // GUARDAR PLANILLA Y REGISTRAR EN HISTORIAL
   const guardarPlanillaYRegistrar = () => {
     const fechaGuardar = fecha || new Date().toISOString().split('T')[0];
     const indexExistente = historial.findIndex((r) => r.fecha === fechaGuardar);
 
-    // Obtener fecha y hora actual formateada
     const ahora = new Date();
     const fechaHoraModificacion = `${ahora.toLocaleDateString('es-AR')} a las ${ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs`;
 
@@ -298,7 +297,8 @@ export default function PlanillaUnificada24H() {
         operador: operadorFinal,
         observaciones: observacionesGenerales || regPrevio.observaciones,
         descargado: false,
-        ultimaModificacion: fechaHoraModificacion, // 👈 Registra la última actualización
+        eliminado: false,
+        ultimaModificacion: fechaHoraModificacion,
         parametros: { ...(regPrevio.parametros || {}), ...parametros },
         filtrosEstado: { ...(regPrevio.filtrosEstado || {}), ...filtrosEstado },
         purgasEstado: { ...(regPrevio.purgasEstado || {}), ...purgasEstado },
@@ -315,7 +315,8 @@ export default function PlanillaUnificada24H() {
         operador: operadorActual || 'SIN REGISTRAR',
         observaciones: observacionesGenerales || 'Sin observaciones registradas.',
         descargado: false,
-        ultimaModificacion: fechaHoraModificacion, // 👈 Registra el primer guardado
+        eliminado: false,
+        ultimaModificacion: fechaHoraModificacion,
         parametros: JSON.parse(JSON.stringify(parametros)),
         filtrosEstado: JSON.parse(JSON.stringify(filtrosEstado)),
         purgasEstado: JSON.parse(JSON.stringify(purgasEstado)),
@@ -331,24 +332,28 @@ export default function PlanillaUnificada24H() {
     alert(`¡Planilla diaria del ${fechaGuardar} guardada/actualizada con éxito!`);
   };
 
-  
+  // OCULTAR REGISTRO Y MOVER A DATOS BORRADOS (SOFT DELETE - SOLO GESTOR GENERAL)
   const eliminarRegistroHistorial = (id: string) => {
+    if (!esGestorGeneral) return;
+
     const registro = historial.find((r) => r.id === id);
     if (!registro) return;
 
     if (!registro.descargado) {
       const confirmarSinDescargar = window.confirm(
-        `⚠️ ¡ATENCIÓN!\n\nEste registro (${registro.fecha}) TODAVÍA NO HA SIDO DESCARGADO/GUARDADO externamente.\n\n¿Estás seguro/a de que deseas borrarlo definitivamente?`
+        `⚠️ ¡ATENCIÓN!\n\nEste registro (${registro.fecha}) TODAVÍA NO HA SIDO DESCARGADO/GUARDADO externamente.\n\n¿Estás seguro/a de que deseas moverlo a Datos Borrados?`
       );
       if (!confirmarSinDescargar) return;
     } else {
       const confirmarBorrado = window.confirm(
-        `¿Confirmas borrar el registro del día ${registro.fecha}?`
+        `¿Confirmas mover a Datos Borrados el registro del día ${registro.fecha}?`
       );
       if (!confirmarBorrado) return;
     }
 
-    const nuevoHistorial = historial.filter((r) => r.id !== id);
+    const nuevoHistorial = historial.map((r) =>
+      r.id === id ? { ...r, eliminado: true } : r
+    );
     setHistorial(nuevoHistorial);
     localStorage.setItem('historial_planillas', JSON.stringify(nuevoHistorial));
 
@@ -462,9 +467,11 @@ export default function PlanillaUnificada24H() {
 
   if (!isMounted) return null;
 
+  const historialVisibles = historial.filter((h) => !h.eliminado);
+
   const historialFiltrado = filtroFechaHistorial 
-    ? historial.filter(h => h.fecha === filtroFechaHistorial)
-    : historial;
+    ? historialVisibles.filter(h => h.fecha === filtroFechaHistorial)
+    : historialVisibles;
 
   return (
     <div className="min-h-screen w-full bg-slate-100 flex flex-col text-xs overflow-y-auto">
@@ -555,14 +562,17 @@ export default function PlanillaUnificada24H() {
                             >
                               Descargar
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => eliminarRegistroHistorial(reg.id)}
-                              className="h-7 px-2.5 font-bold text-xs shadow-none"
-                            >
-                              🗑️ Borrar
-                            </Button>
+                            {/* Botón Borrar restringido exclusivamente al Gestor General */}
+                            {esGestorGeneral && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => eliminarRegistroHistorial(reg.id)}
+                                className="h-7 px-2.5 font-bold text-xs shadow-none"
+                              >
+                                🗑️ Borrar
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -589,10 +599,10 @@ export default function PlanillaUnificada24H() {
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="p-2 flex flex-col gap-2">
-        {/* SUB-HEADER CON SELECCIÓN DE TURNO Y FECHA DIARIA */}
+        {/* SUB-HEADER CON SELECCIÓN DE TURNO Y FECHA */}
         <div className="flex flex-wrap justify-between items-center bg-white p-2 rounded shadow-sm border gap-2">
           <h1 className="font-bold text-sm text-slate-800 shrink-0">
-            Planilla Control Planta Potabilizadora SPSE
+            Planilla Control Planta Potabilizadora CALAFATE
           </h1>
           
           <div className="flex-1 flex justify-center">
@@ -612,7 +622,7 @@ export default function PlanillaUnificada24H() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <label className="font-semibold text-slate-600 text-xs">Fecha:</label>
             <input 
               type="date" 

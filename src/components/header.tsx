@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu } from 'lucide-react';
+import { Menu, Trash2, ShieldCheck } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -21,11 +21,12 @@ const navItems = [
   { href: '/stock', label: 'Stock' },
   { href: '/guia-dosificacion', label: 'Guía Dosificación' },
   { href: '/guia-parshall', label: 'Guía Parshall' },
+  { href: '/tanques-gas-cloro', label: 'Tanques Gas Cloro' },
 ];
 
 export function Header() {
   const pathname = usePathname();
-  const { operadorActual, horaActualSistema, abrirModalOperador } = useOperador();
+  const { operadorActual, esGestorGeneral, horaActualSistema, abrirModalOperador } = useOperador();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
@@ -55,19 +56,52 @@ export function Header() {
           ))}
         </nav>
 
+        {/* ACCESO A DATOS BORRADOS (A LA IZQUIERDA DEL USUARIO) */}
+        <Link
+          href="/datos-borrados"
+          className={cn(
+            'flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all shrink-0 ml-auto md:ml-0',
+            pathname === '/datos-borrados'
+              ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
+              : 'bg-slate-50 hover:bg-amber-50 border-slate-300 text-slate-700 hover:text-amber-800'
+          )}
+          title="Ver y restaurar datos borrados"
+        >
+          <Trash2 className="w-4 h-4 text-amber-600" />
+          <span className="hidden sm:inline">Datos Borrados</span>
+        </Link>
+
         {/* FICHA OPERADOR + RELOJ (DERECHA) */}
         <div
           onClick={() => abrirModalOperador()}
-          className="flex items-center gap-2 border border-sky-300 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-lg cursor-pointer transition-all shrink-0 ml-auto"
+          className={cn(
+            "flex items-center gap-2 border px-3 py-1 rounded-lg cursor-pointer transition-all shrink-0",
+            esGestorGeneral
+              ? "border-emerald-400 bg-emerald-50 hover:bg-emerald-100 shadow-xs"
+              : "border-sky-300 bg-sky-50 hover:bg-sky-100"
+          )}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
+          {esGestorGeneral ? (
+            <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          )}
+
           <div className="flex flex-col leading-tight">
-            <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide">
-              {operadorActual}
-              <span className="text-sky-500 font-normal ml-1 text-[10px]">(Editar)</span>
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide">
+                {operadorActual}
+              </span>
+              {esGestorGeneral ? (
+                <span className="bg-emerald-200 text-emerald-950 text-[9px] px-1 py-0.2 rounded font-black border border-emerald-400">
+                  ADMIN
+                </span>
+              ) : (
+                <span className="text-sky-500 font-normal text-[10px]">(Editar)</span>
+              )}
+            </div>
             <div className="flex items-center text-[10px]">
               <span className="font-mono text-emerald-600 font-extrabold text-xs">{horaActualSistema}</span>
             </div>
@@ -102,6 +136,17 @@ export function Header() {
                       </Link>
                     </SheetClose>
                   ))}
+                  <SheetClose asChild>
+                    <Link
+                      href="/datos-borrados"
+                      className={cn(
+                        'text-sm font-bold flex items-center gap-2 text-amber-700 transition-colors',
+                        pathname === '/datos-borrados' ? 'text-primary font-bold' : ''
+                      )}
+                    >
+                      <Trash2 className="w-4 h-4" /> Datos Borrados
+                    </Link>
+                  </SheetClose>
                 </nav>
               </div>
             </SheetContent>

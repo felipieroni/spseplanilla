@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import * as XLSX from 'xlsx';
+import { useOperador } from '@/context/operador-context'; // 👈 1. Importar hook
 
 export interface RegistroHistorial {
   id: string;
@@ -11,6 +12,7 @@ export interface RegistroHistorial {
   turno: string;
   operador: string;
   observaciones: string;
+  eliminado?: boolean;
   ultimaModificacion?: string;
   parametros?: Record<string, Record<string, string>>;
   filtrosEstado?: Record<string, Record<string, string>>;
@@ -51,12 +53,15 @@ interface Props {
 }
 
 export default function HistorialPlanillas({ historial = [], onEliminar }: Props) {
+  const { esGestorGeneral } = useOperador(); // 👈 2. Obtener permiso de Gestor
   const [filtroFecha, setFiltroFecha] = useState('');
   const [registroSeleccionado, setRegistroSeleccionado] = useState<RegistroHistorial | null>(null);
 
+  const historialVisibles = historial.filter((h) => !h.eliminado);
+
   const historialFiltrado = filtroFecha
-    ? historial.filter((h) => h.fecha === filtroFecha)
-    : historial;
+    ? historialVisibles.filter((h) => h.fecha === filtroFecha)
+    : historialVisibles;
 
   const exportarPlanillaAExcel = (registro: RegistroHistorial) => {
     const datosFilas = HORARIOS_IMPARES.map((hsImp, idx) => {
@@ -180,13 +185,18 @@ export default function HistorialPlanillas({ historial = [], onEliminar }: Props
                       >
                         Excel
                       </Button>
-                      <Button
-                        onClick={() => onEliminar?.(reg.id)}
-                        variant="destructive"
-                        className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold"
-                      >
-                        🗑️ Borrar
-                      </Button>
+                      
+                      {/* 👈 3. Botón Borrar restringido a Gestor General */}
+                      {esGestorGeneral && (
+                        <Button
+                          onClick={() => onEliminar?.(reg.id)}
+                          variant="destructive"
+                          className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold"
+                          title="Ocultar planilla y mover a Datos Borrados"
+                        >
+                          🗑️ Borrar
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))
