@@ -63,8 +63,9 @@ const PURGAS_MODULO_B = [
 
 const ALL_PURGAS = [...PURGAS_MODULO_A, ...PURGAS_MODULO_B];
 
-const PAC10_PV = 1.26;
-const SODA_PV = 0.05;
+// FACTORES DE DOSIFICACIÓN CORRECTOS
+const PAC10_PV = 1.26; // PAC 10% Comercial
+const SODA_PV = 0.05;  // Solución de Soda preparada al 5% en tanque
 
 const parseNumber = (val: string | number | undefined): number => {
   if (val === undefined || val === null || val === '') return 0;
@@ -202,7 +203,6 @@ export default function PlanillaUnificada24H() {
       ultimoPasoLavado[f.key] = -Infinity;
     });
 
-    // 1. Revisar la planilla activa en tiempo real
     Object.entries(filtrosEstado || {}).forEach(([hs, hsData]) => {
       if (!hsData) return;
       const hIndex = HORARIOS_IMPARES.indexOf(hs);
@@ -217,7 +217,6 @@ export default function PlanillaUnificada24H() {
       });
     });
 
-    // 2. Revisar el historial guardado de días anteriores (ignora eliminados)
     historial
       .filter((r) => !r.eliminado)
       .forEach((registro, idx) => {
@@ -332,7 +331,6 @@ export default function PlanillaUnificada24H() {
     alert(`¡Planilla diaria del ${fechaGuardar} guardada/actualizada con éxito!`);
   };
 
-  // OCULTAR REGISTRO Y MOVER A DATOS BORRADOS (SOFT DELETE - SOLO GESTOR GENERAL)
   const eliminarRegistroHistorial = (id: string) => {
     if (!esGestorGeneral) return;
 
@@ -383,6 +381,7 @@ export default function PlanillaUnificada24H() {
     localStorage.setItem('historial_planillas', JSON.stringify(nuevoHistorial));
   };
 
+  // CONVERSIÓN BIDIRECCIONAL CON SODA AL 5% (SODA_PV = 0.05)
   const handleInputChange = (hs: string, campo: string, valor: string) => {
     setParametros((prev) => {
       const horaActual = { ...(prev[hs] || {}) };
@@ -408,11 +407,15 @@ export default function PlanillaUnificada24H() {
         const ppm = parseNumber(valor);
         if (ppm > 0 && Qp > 0) {
           horaActual.pacMlMin = Math.round((ppm * Qp) / (60 * PAC10_PV)).toString();
+        } else if (valor.trim() === '') {
+          horaActual.pacMlMin = '';
         }
       } else if (campo === 'pacMlMin') {
         const ml = parseNumber(valor);
         if (ml > 0 && Qp > 0) {
           horaActual.pacPpm = ((ml * PAC10_PV * 60) / Qp).toFixed(1);
+        } else if (valor.trim() === '') {
+          horaActual.pacPpm = '';
         }
       }
 
@@ -420,11 +423,15 @@ export default function PlanillaUnificada24H() {
         const ppm = parseNumber(valor);
         if (ppm > 0 && Qp > 0) {
           horaActual.sodaMlMin = Math.round((ppm * Qp) / (60 * SODA_PV)).toString();
+        } else if (valor.trim() === '') {
+          horaActual.sodaMlMin = '';
         }
       } else if (campo === 'sodaMlMin') {
         const ml = parseNumber(valor);
         if (ml > 0 && Qp > 0) {
           horaActual.sodaPpm = ((ml * SODA_PV * 60) / Qp).toFixed(1);
+        } else if (valor.trim() === '') {
+          horaActual.sodaPpm = '';
         }
       }
 
@@ -562,7 +569,6 @@ export default function PlanillaUnificada24H() {
                             >
                               Descargar
                             </Button>
-                            {/* Botón Borrar restringido exclusivamente al Gestor General */}
                             {esGestorGeneral && (
                               <Button
                                 size="sm"

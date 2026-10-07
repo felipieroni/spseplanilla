@@ -39,7 +39,9 @@ interface RegistroStockDiario {
   ultimaModificacion?: string;
 }
 
-// CONVERTIDOR ROBUSTO Y SEGURO DE NÚMEROS
+// FACTOR DE CONCENTRACIÓN DE SODA AL 5% EN TANQUE
+const SODA_PV = 0.05;
+
 const parseVal = (val: any): number => {
   if (val === undefined || val === null || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -56,7 +58,6 @@ const parseVal = (val: any): number => {
   return isNaN(num) ? 0 : num;
 };
 
-// HOMOLOGADOR UNIVERSAL Y SEGURO DE FECHAS (YYYY-MM-DD)
 const normalizarFecha = (f: any): string => {
   if (!f) return '';
   const str = String(f).trim();
@@ -90,10 +91,8 @@ export default function StockPage() {
   const { esGestorGeneral } = useOperador();
   const [isMounted, setIsMounted] = useState(false);
 
-  // FECHA Y REGISTRO DIARIO
   const [fecha, setFecha] = useState('');
 
-  // PAC Y SODA
   const [pacPrincipio, setPacPrincipio] = useState('');
   const [pacEntrada, setPacEntrada] = useState('');
   const [pacSalida, setPacSalida] = useState('');
@@ -104,26 +103,13 @@ export default function StockPage() {
   const [sodaSalida, setSodaSalida] = useState('');
   const [sodaDestino, setSodaDestino] = useState('');
 
-  // ESTADOS MASTER Y DÍA
   const [tanques, setTanques] = useState<TanqueGasCloro[]>([]);
   const [historialPlanillas, setHistorialPlanillas] = useState<RegistroHistorialPlanilla[]>([]);
   const [historialStockMap, setHistorialStockMap] = useState<Record<string, RegistroStockDiario>>({});
 
-  const createTanqueInicial = (): TanqueGasCloro[] => [
-    {
-      id: '1',
-      tanqueNo: '10',
-      pesoTotal: '130',
-      pesoTara: '60',
-      fechaIngreso: '',
-      fechaES: '',
-      estado: 'EN_USO',
-      posicion: 'BALANZA_1',
-      eliminado: false,
-    },
-  ];
+  // ESTADO INICIAL COMPLETAMENTE VACÍO (SIN TANQUES PREDETERMINADOS)
+  const createTanqueInicial = (): TanqueGasCloro[] => [];
 
-  // REFRESCAR HISTORIAL DESDE LOCALSTORAGE
   const actualizarHistorialPlanillas = () => {
     const datosPlanillas = localStorage.getItem('historial_planillas');
     if (datosPlanillas) {
@@ -136,7 +122,6 @@ export default function StockPage() {
     }
   };
 
-  // CÁLCULO DE CONSUMOS DESDE PLANILLAS DIARIAS
   const consumosDiariosPlanillasMap = useMemo(() => {
     const mapCloroKg: Record<string, number> = {};
     const mapPacLts: Record<string, number> = {};
@@ -166,7 +151,7 @@ export default function StockPage() {
             }
 
             if (pMl > 0) pacLts += (pMl * 120) / 1000;
-            if (sMl > 0) sodaKg += (sMl * 120) / 1000;
+            if (sMl > 0) sodaKg += (sMl * 120 * SODA_PV) / 1000;
           });
         }
 
@@ -179,7 +164,6 @@ export default function StockPage() {
     return { mapCloroKg, mapPacLts, mapSodaKg };
   }, [historialPlanillas]);
 
-  // GUARDAR AUTOMÁTICO AL CAMBIAR DE DÍA
   const guardarEstadoActualPrevio = (fechaAguardar: string) => {
     if (!fechaAguardar) return;
     const fechaNorm = normalizarFecha(fechaAguardar);
@@ -205,7 +189,6 @@ export default function StockPage() {
     return nuevoMap;
   };
 
-  // CARGAR DATOS DE UNA FECHA ESPECÍFICA CON CONSERVACIÓN COMPLETA DE TANQUES
   const cargarDatosStockFecha = (fechaSel: string, mapStockActual: Record<string, RegistroStockDiario>) => {
     actualizarHistorialPlanillas();
     const fechaNormSel = normalizarFecha(fechaSel);
@@ -269,7 +252,7 @@ export default function StockPage() {
         if (datosMaster) {
           try {
             const parsed = JSON.parse(datosMaster);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
               setTanques(parsed);
             } else {
               setTanques(createTanqueInicial());
@@ -330,7 +313,6 @@ export default function StockPage() {
     cargarDatosStockFecha(nuevaFecha, mapaActualizado || historialStockMap);
   };
 
-  // ACCIÓN DE GUARDADO COMPLETO
   const guardarDatosDia = () => {
     if (!fecha) return;
     const fechaNorm = normalizarFecha(fecha);
@@ -343,7 +325,6 @@ export default function StockPage() {
     alert(`¡Planilla de stock para el día ${fechaNorm} guardada correctamente!`);
   };
 
-  // CAMBIOS EN TANQUES MEDIANTE ID
   const handleTanqueChange = (id: string, campo: keyof TanqueGasCloro, valor: any) => {
     let nuevosTanques = [...tanques];
     const index = nuevosTanques.findIndex((t) => t.id === id);
@@ -390,8 +371,8 @@ export default function StockPage() {
       {
         id: Date.now().toString(),
         tanqueNo: '',
-        pesoTotal: '130',
-        pesoTara: '60',
+        pesoTotal: '0',
+        pesoTara: '0',
         fechaIngreso: '',
         fechaES: '',
         estado: 'EN_ESPERA' as const,
@@ -403,15 +384,8 @@ export default function StockPage() {
     localStorage.setItem('stock_tanques_master_v8', JSON.stringify(nuevos));
   };
 
-  // OCULTAR TANQUE Y MOVER A DATOS BORRADOS (SOFT DELETE - SOLO GESTOR GENERAL)
   const eliminarTanque = (id: string) => {
     if (!esGestorGeneral) return;
-
-    const tanquesActivos = tanques.filter((t) => !t.eliminado);
-    if (tanquesActivos.length <= 1) {
-      alert('Debe permanecer al menos un tanque activo en el stock.');
-      return;
-    }
 
     const confirmar = window.confirm('¿Deseas mover este tanque a Datos Borrados?');
     if (!confirmar) return;
@@ -667,162 +641,158 @@ export default function StockPage() {
             </TableHeader>
 
             <TableBody>
-              {tanquesActivos.map((tanque) => {
-                const pTotal = parseVal(tanque.pesoTotal);
-                const pTara = parseVal(tanque.pesoTara);
-                const netoInicial = Math.max(0, pTotal - pTara);
+              {tanquesActivos.length > 0 ? (
+                tanquesActivos.map((tanque) => {
+                  const pTotal = parseVal(tanque.pesoTotal);
+                  const pTara = parseVal(tanque.pesoTara);
+                  const netoInicial = Math.max(0, pTotal - pTara);
 
-                const esEnUso = tanque.estado === 'EN_USO';
-                const consumoDia = esEnUso ? consumoCloroHoy : 0;
-                const netoRestante = Math.max(0, netoInicial - consumoDia);
+                  const esEnUso = tanque.estado === 'EN_USO';
+                  const consumoDia = esEnUso ? consumoCloroHoy : 0;
+                  const netoRestante = Math.max(0, netoInicial - consumoDia);
 
-                // VERIFICAR DISPONIBILIDAD DE BALANZAS
-                const b1Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_1');
-                const b2Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_2');
+                  const b1Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_1');
+                  const b2Ocupada = tanquesActivos.some((t) => t.id !== tanque.id && t.posicion === 'BALANZA_2');
 
-                return (
-                  <TableRow
-                    key={tanque.id}
-                    className={`border-b border-slate-300 transition-colors ${
-                      esEnUso
-                        ? 'bg-emerald-100 hover:bg-emerald-100 font-semibold text-emerald-950'
-                        : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    
-                    {/* 1. TANQUE N° */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <Input
-                        type="text"
-                        placeholder="N°"
-                        value={tanque.tanqueNo}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'tanqueNo', e.target.value)}
-                        className="h-7 text-center text-xs border-none shadow-none font-bold text-slate-900 bg-transparent"
-                      />
-                    </TableCell>
+                  return (
+                    <TableRow
+                      key={tanque.id}
+                      className={`border-b border-slate-300 transition-colors ${
+                        esEnUso
+                          ? 'bg-emerald-100 hover:bg-emerald-100 font-semibold text-emerald-950'
+                          : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <Input
+                          type="text"
+                          placeholder="N°"
+                          value={tanque.tanqueNo}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'tanqueNo', e.target.value)}
+                          className="h-7 text-center text-xs border-none shadow-none font-bold text-slate-900 bg-transparent"
+                        />
+                      </TableCell>
 
-                    {/* 2. PESO TOTAL */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <Input
-                        type="text"
-                        placeholder="0"
-                        value={tanque.pesoTotal}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'pesoTotal', e.target.value)}
-                        className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
-                      />
-                    </TableCell>
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <Input
+                          type="text"
+                          placeholder="0"
+                          value={tanque.pesoTotal}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'pesoTotal', e.target.value)}
+                          className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
+                        />
+                      </TableCell>
 
-                    {/* 3. PESO TARA */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <Input
-                        type="text"
-                        placeholder="0"
-                        value={tanque.pesoTara}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'pesoTara', e.target.value)}
-                        className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
-                      />
-                    </TableCell>
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <Input
+                          type="text"
+                          placeholder="0"
+                          value={tanque.pesoTara}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'pesoTara', e.target.value)}
+                          className="h-7 text-center text-xs border-none shadow-none font-medium bg-transparent"
+                        />
+                      </TableCell>
 
-                    {/* 4. CONSUMO DEL DÍA */}
-                    <TableCell className={`p-1 border-r border-slate-300 font-mono font-bold ${esEnUso ? 'text-amber-900 bg-transparent' : 'text-amber-950 bg-amber-50/60'}`}>
-                      {consumoDia > 0 ? `${consumoDia.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg` : '-'}
-                    </TableCell>
+                      <TableCell className={`p-1 border-r border-slate-300 font-mono font-bold ${esEnUso ? 'text-amber-900 bg-transparent' : 'text-amber-950 bg-amber-50/60'}`}>
+                        {consumoDia > 0 ? `${consumoDia.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg` : '-'}
+                      </TableCell>
 
-                    {/* 5. PESO NETO RESTANTE */}
-                    <TableCell className={`p-1 font-black text-blue-950 text-sm font-mono border-r border-slate-300 ${esEnUso ? 'bg-emerald-200/60' : 'bg-blue-100/90'}`}>
-                      {netoRestante.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg
-                    </TableCell>
+                      <TableCell className={`p-1 font-black text-blue-950 text-sm font-mono border-r border-slate-300 ${esEnUso ? 'bg-emerald-200/60' : 'bg-blue-100/90'}`}>
+                        {netoRestante.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg
+                      </TableCell>
 
-                    {/* 6. FECHA INGRESO */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <Input
-                        type="date"
-                        value={tanque.fechaIngreso}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'fechaIngreso', e.target.value)}
-                        className="h-7 text-center text-xs border-none shadow-none bg-transparent"
-                      />
-                    </TableCell>
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <Input
+                          type="date"
+                          value={tanque.fechaIngreso}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'fechaIngreso', e.target.value)}
+                          className="h-7 text-center text-xs border-none shadow-none bg-transparent"
+                        />
+                      </TableCell>
 
-                    {/* 7. FECHA E/S */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <Input
-                        type="date"
-                        value={tanque.fechaES}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'fechaES', e.target.value)}
-                        className="h-7 text-center text-xs border-none shadow-none bg-transparent"
-                      />
-                    </TableCell>
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <Input
+                          type="date"
+                          value={tanque.fechaES}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'fechaES', e.target.value)}
+                          className="h-7 text-center text-xs border-none shadow-none bg-transparent"
+                        />
+                      </TableCell>
 
-                    {/* 8. POSICIÓN (BALANZAS ÚNICAS) */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <select
-                        value={tanque.posicion}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'posicion', e.target.value)}
-                        className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
-                          esEnUso ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      >
-                        <option value="BALANZA_1" disabled={b1Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
-                          Balanza 1 {b1Ocupada ? '(Ocupada)' : ''}
-                        </option>
-                        <option value="BALANZA_2" disabled={b2Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
-                          Balanza 2 {b2Ocupada ? '(Ocupada)' : ''}
-                        </option>
-                        {!esEnUso && (
-                          <>
-                            <option value="EN_DEPOSITO" className="bg-white text-slate-800">En Depósito</option>
-                            <option value="FUERA_PLANTA" className="bg-white text-slate-800">Fuera de planta</option>
-                          </>
-                        )}
-                      </select>
-                    </TableCell>
-
-                    {/* 9. ESTADO (EN USO / EN ESPERA) */}
-                    <TableCell className="p-1 border-r border-slate-300">
-                      <select
-                        value={tanque.estado}
-                        onChange={(e) => handleTanqueChange(tanque.id, 'estado', e.target.value)}
-                        className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
-                          esEnUso
-                            ? 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-sm'
-                            : 'bg-white text-slate-800 border-slate-300'
-                        }`}
-                      >
-                        <option value="EN_USO" className="bg-emerald-600 text-white font-bold">
-                          ⚡ En uso
-                        </option>
-                        <option value="EN_ESPERA" className="bg-white text-slate-800 font-normal">
-                          En espera
-                        </option>
-                      </select>
-                    </TableCell>
-
-                    {/* 10. BORRAR FILA */}
-                    <TableCell className="p-1 text-center">
-                      {esGestorGeneral ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => eliminarTanque(tanque.id)}
-                          className="h-7 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
-                          title="Ocultar Tanque y mover a Datos Borrados"
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <select
+                          value={tanque.posicion}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'posicion', e.target.value)}
+                          className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
+                            esEnUso ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
                         >
-                          Borrar
-                        </Button>
-                      ) : (
-                        <span className="text-slate-400 font-medium italic text-[11px]">-</span>
-                      )}
-                    </TableCell>
+                          <option value="BALANZA_1" disabled={b1Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
+                            Balanza 1 {b1Ocupada ? '(Ocupada)' : ''}
+                          </option>
+                          <option value="BALANZA_2" disabled={b2Ocupada} className="bg-white text-slate-800 disabled:text-slate-300">
+                            Balanza 2 {b2Ocupada ? '(Ocupada)' : ''}
+                          </option>
+                          {!esEnUso && (
+                            <>
+                              <option value="EN_DEPOSITO" className="bg-white text-slate-800">En Depósito</option>
+                              <option value="FUERA_PLANTA" className="bg-white text-slate-800">Fuera de planta</option>
+                            </>
+                          )}
+                        </select>
+                      </TableCell>
 
-                  </TableRow>
-                );
-              })}
+                      <TableCell className="p-1 border-r border-slate-300">
+                        <select
+                          value={tanque.estado}
+                          onChange={(e) => handleTanqueChange(tanque.id, 'estado', e.target.value)}
+                          className={`h-7 w-full text-center text-xs border rounded font-bold outline-none cursor-pointer ${
+                            esEnUso
+                              ? 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-sm'
+                              : 'bg-white text-slate-800 border-slate-300'
+                          }`}
+                        >
+                          <option value="EN_USO" className="bg-emerald-600 text-white font-bold">
+                            ⚡ En uso
+                          </option>
+                          <option value="EN_ESPERA" className="bg-white text-slate-800 font-normal">
+                            En espera
+                          </option>
+                        </select>
+                      </TableCell>
+
+                      <TableCell className="p-1 text-center">
+                        {esGestorGeneral ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => eliminarTanque(tanque.id)}
+                            className="h-7 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
+                            title="Ocultar Tanque y mover a Datos Borrados"
+                          >
+                            Borrar
+                          </Button>
+                        ) : (
+                          <span className="text-slate-400 font-medium italic text-[11px]">-</span>
+                        )}
+                      </TableCell>
+
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={10} className="p-4 text-center text-slate-400 italic">
+                    No hay tanques registrados. Haz clic en <strong>+ Agregar Tanque</strong> para ingresar uno.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* BOTÓN INFERIOR: GUARDAR PLANILLA COMPLETA */}
       <div className="w-full max-w-7xl mx-auto pt-4 flex justify-center">
         <Button
           onClick={guardarDatosDia}

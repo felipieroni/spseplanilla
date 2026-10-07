@@ -28,7 +28,7 @@ const OperadorContext = createContext<OperadorContextType | undefined>(undefined
 export function OperadorProvider({ children }: { children: ReactNode }) {
   const [turnoActivo, setTurnoActivo] = useState('06:00 a 12:00');
   
-  // Estado inicial vacío para que en navegadores nuevos figure "SIN REGISTRAR" por defecto
+  // Estado inicial vacío para que en navegadores nuevos figure "SIN DEFINIR"
   const [operadoresTurnos, setOperadoresTurnos] = useState<Record<string, string>>({});
   
   const [horaActualSistema, setHoraActualSistema] = useState('');
@@ -84,6 +84,12 @@ export function OperadorProvider({ children }: { children: ReactNode }) {
     if (opActual.trim().toUpperCase() === 'GESTOR GENERAL') {
       setTipoRol('GESTOR');
       setNombreOperadorInput('');
+    } else if (
+      opActual.trim().toUpperCase() === 'SIN DEFINIR' ||
+      opActual.trim().toUpperCase() === 'SIN REGISTRAR'
+    ) {
+      setTipoRol('OPERADOR');
+      setNombreOperadorInput('');
     } else {
       setTipoRol('OPERADOR');
       setNombreOperadorInput(opActual);
@@ -108,10 +114,9 @@ export function OperadorProvider({ children }: { children: ReactNode }) {
       }));
     } else {
       const nombreLimpio = nombreOperadorInput.trim().toUpperCase();
-      if (!nombreLimpio) return;
       setOperadoresTurnos((prev) => ({
         ...prev,
-        [turnoSeleccionadoTemp]: nombreLimpio,
+        [turnoSeleccionadoTemp]: nombreLimpio || 'SIN DEFINIR',
       }));
     }
 
@@ -121,7 +126,8 @@ export function OperadorProvider({ children }: { children: ReactNode }) {
     setErrorPassword('');
   };
 
-  const operadorActual = operadoresTurnos[turnoActivo] || 'SIN REGISTRAR';
+  // Si no hay operador asignado al turno activo, retorna "SIN DEFINIR"
+  const operadorActual = operadoresTurnos[turnoActivo] || 'SIN DEFINIR';
   const esGestorGeneral = operadorActual.trim().toUpperCase() === 'GESTOR GENERAL';
 
   return (
@@ -236,7 +242,7 @@ export function OperadorProvider({ children }: { children: ReactNode }) {
             </Button>
             <Button
               onClick={guardarOperador}
-              disabled={tipoRol === 'OPERADOR' ? !nombreOperadorInput.trim() : !passwordInput.trim()}
+              disabled={tipoRol === 'OPERADOR' ? false : !passwordInput.trim()}
               className="bg-blue-700 hover:bg-blue-800 text-xs text-white h-8 font-bold gap-1"
             >
               {tipoRol === 'GESTOR' && <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />}
